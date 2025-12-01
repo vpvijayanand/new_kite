@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Login - Kite Dashboard{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-6">
+        <div class="card shadow-lg">
+            <div class="card-body text-center p-5">
+                <h1 class="card-title mb-4">Welcome to Kite Dashboard</h1>
+                <p class="text-muted mb-4">Connect your Kite Zerodha account to view live Nifty 50 prices</p>
+                
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('auth.kite_login') }}" class="btn btn-primary btn-lg">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-box-arrow-in-right me-2" viewBox="0 0 16 16">
+                            <path fill-rule="evenodd" d="M6 3.5a.5.5 0 0 1 .5-.5h8a.5.5 0 0 1 .5.5v9a.5.5 0 0 1-.5.5h-8a.5.5 0 0 1-.5-.5v-2a.5.5 0 0 0-1 0v2A1.5 1.5 0 0 0 6.5 14h8a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 14.5 2h-8A1.5 1.5 0 0 0 5 3.5v2a.5.5 0 0 0 1 0v-2z"/>
+                            <path fill-rule="evenodd" d="M11.854 8.354a.5.5 0 0 0 0-.708l-3-3a.5.5 0 1 0-.708.708L10.293 7.5H1.5a.5.5 0 0 0 0 1h8.793l-2.147 2.146a.5.5 0 0 0 .708.708l3-3z"/>
+                        </svg>
+                        Login with Kite Zerodha
+                    </a>
+                </div>
+                
+                <div class="mt-4">
+                    <small class="text-muted">
+                        You will be redirected to Kite's secure login page
+                    </small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="mt-4 text-center">
+            <p class="text-muted">
+                <strong>Features:</strong><br>
+                Real-time Nifty 50 price tracking | Minute-by-minute updates | Historical data
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

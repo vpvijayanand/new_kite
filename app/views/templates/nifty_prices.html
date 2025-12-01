@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Nifty Prices{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>Nifty 50 Price History</h1>
+            <div>
+                <select class="form-select" id="timeFilter">
+                    <option value="24">Last 24 Hours</option>
+                    <option value="48">Last 48 Hours</option>
+                    <option value="168">Last Week</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="card-title mb-0">Price Changes (Every Minute)</h5>
+                    <button class="btn btn-sm btn-primary" id="autoRefreshToggle">
+                        Auto-refresh: <span id="autoRefreshStatus">ON</span>
+                    </button>
+                </div>
+                
+                <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
+                    <table class="table table-hover table-striped">
+                        <thead class="sticky-top bg-white">
+                            <tr>
+                                <th>#</th>
+                                <th>Date & Time</th>
+                                <th>Price (₹)</th>
+                                <th>Change (₹)</th>
+                                <th>Change (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="priceTable">
+                            <tr>
+                                <td colspan="5" class="text-center">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let autoRefresh = true;
+let refreshInterval;
+
+function loadPrices() {
+    const hours = document.getElementById('timeFilter').value;
+    
+    fetch(`/api/prices/history?hours=${hours}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                renderTable(data.data);
+            }
+        })
+        .catch(error => console.error('Error:', error));
+}
+
+function renderTable(prices) {
+    const tbody = document.getElementById('priceTable');
+    
+    if (prices.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center">No data available</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = prices.map((price, index) => {
+        const changeClass = price.change >= 0 ? 'text-success' : 'text-danger';
+        const changeIcon = price.change >= 0 ? '▲' : '▼';
+        
+        return `
+            <tr>
+                <td>${index + 1}</td>
+                <td>${price.timestamp}</td>
+                <td>₹${price.price.toFixed(2)}</td>
+                <td class="${changeClass}">${changeIcon} ${price.change ? price.change.toFixed(2) : '--'}</td>
+                <td class="${changeClass}">${price.change_percent ? price.change_percent.toFixed(2) + '%' : '--'}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+document.getElementById('timeFilter').addEventListener('change', loadPrices);
+
+document.getElementById('autoRefreshToggle').addEventListener('click', function() {
+    autoRefresh = !autoRefresh;
+    document.getElementById('autoRefreshStatus').textContent = autoRefresh ? 'ON' : 'OFF';
+    
+    if (autoRefresh) {
+        startAutoRefresh();
+    } else {
+        clearInterval(refreshInterval);
+    }
+});
+
+function startAutoRefresh() {
+    refreshInterval = setInterval(loadPrices, 60000); // Refresh every minute
+}
+
+// Initial load
+loadPrices();
+startAutoRefresh();
+</script>
+{% endblock %}

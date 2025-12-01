@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1 class="mb-4">Market Dashboard</h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Current Nifty 50 Price</h5>
+                <h2 class="text-primary" id="currentPrice">Loading...</h2>
+                <p class="mb-1">
+                    <span id="priceChange" class="badge">--</span>
+                </p>
+                <p class="text-muted small" id="lastUpdate">--</p>
+                <button class="btn btn-sm btn-primary" id="refreshBtn">Refresh Now</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Quick Stats</h5>
+                <div class="row text-center">
+                    <div class="col-md-4">
+                        <h6 class="text-muted">Total Records</h6>
+                        <h3 id="totalRecords">--</h3>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-muted">Today's High</h6>
+                        <h3 id="todayHigh">--</h3>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-muted">Today's Low</h6>
+                        <h3 id="todayLow">--</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Recent Price Updates (Last 10)</h5>
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Price</th>
+                                <th>Change</th>
+                                <th>Change %</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recentPrices">
+                            <tr>
+                                <td colspan="4" class="text-center">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}
