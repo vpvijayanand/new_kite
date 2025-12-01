@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 from app.services.market_service import MarketService
 from app.services.kite_service import KiteService
+from app.controllers.oi_controller import oi_changes_api
 
 api_bp = Blueprint('api', __name__)
 
@@ -65,3 +66,14 @@ def api_status():
         'message': 'API is running',
         'version': '1.0.0'
     })
+
+@api_bp.route('/oi-changes', methods=['GET'])
+def get_oi_changes():
+    """API endpoint to get OI changes data"""
+    return oi_changes_api()
+
+@api_bp.route('/oi-history/<strike_price>/<option_type>', methods=['GET'])
+def get_oi_history(strike_price, option_type):
+    """API endpoint to get OI history for specific strike and option type"""
+    from app.controllers.oi_controller import get_oi_history_data
+    return get_oi_history_data(strike_price, option_type)

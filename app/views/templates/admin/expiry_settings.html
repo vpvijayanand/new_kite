@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+
+{% block title %}Admin - Expiry Settings{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-calendar-alt text-primary"></i> Expiry Settings Management</h2>
+                <a href="{{ url_for('market.dashboard') }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Dashboard
+                </a>
+            </div>
+
+            <!-- Quick Set Form -->
+            <div class="row mb-4">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0"><i class="fas fa-settings"></i> Quick Setup - Current Expiry Dates</h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="bulkExpiryForm">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6 class="text-primary">NIFTY 50</h6>
+                                        <div class="mb-3">
+                                            <label for="niftyExpiry" class="form-label">Current Expiry Date</label>
+                                            <input type="date" class="form-control" id="niftyExpiry" required>
+                                            <div class="form-text">Weekly expiry - Usually Thursday</div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="niftyNextExpiry" class="form-label">Next Expiry (Optional)</label>
+                                            <input type="date" class="form-control" id="niftyNextExpiry">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6 class="text-success">BANK NIFTY</h6>
+                                        <div class="mb-3">
+                                            <label for="bankniftyExpiry" class="form-label">Current Expiry Date</label>
+                                            <input type="date" class="form-control" id="bankniftyExpiry" required>
+                                            <div class="form-text">Weekly expiry - Usually Thursday</div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="bankniftyNextExpiry" class="form-label">Next Expiry (Optional)</label>
+                                            <input type="date" class="form-control" id="bankniftyNextExpiry">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <button type="button" class="btn btn-info" onclick="loadCurrentSettings()">
+                                        <i class="fas fa-sync"></i> Load Current Settings
+                                    </button>
+                                    <div>
+                                        <button type="button" class="btn btn-warning me-2" onclick="setTodayAsExpiry()">
+                                            <i class="fas fa-calendar-day"></i> Use Today's Date
+                                        </button>
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="fas fa-save"></i> Update Expiry Dates
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Current Settings Display -->
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header bg-secondary text-white">
+                            <h5 class="mb-0"><i class="fas fa-list"></i> Current Expiry Settings</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-striped" id="expirySettingsTable">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th>Underlying</th>
+                                            <th>Current Expiry</th>
+                                            <th>Next Expiry</th>
+                                            <th>Last Updated</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Data loaded via JavaScript -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Impact Information -->
+            <div class="row mt-4">
+                <div class="col-md-12">
+                    <div class="alert alert-info">
+                        <h6><i class="fas fa-info-circle"></i> Important Information:</h6>
+                        <ul class="mb-0">
+                            <li><strong>Current Expiry:</strong> This is used to generate option chain data for the ±300 point range</li>
+                            <li><strong>NIFTY:</strong> Usually weekly expiry on Thursday (some weeks may have different dates)</li>
+                            <li><strong>BankNifty:</strong> Usually weekly expiry on Thursday (some weeks may have different dates)</li>
+                            <li><strong>Impact:</strong> Changing expiry dates will affect all option chain calculations and market sentiment analysis</li>
+                            <li><strong>Recommendation:</strong> Update expiry dates every week or when the current expiry passes</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Success/Error Modal -->
+<div class="modal fade" id="resultModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="resultModalTitle">Result</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="resultModalBody">
+                <!-- Result content -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadCurrentSettings();
+    loadExpirySettingsTable();
+    
+    // Form submission
+    document.getElementById('bulkExpiryForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        updateExpirySettings();
+    });
+});
+
+function loadCurrentSettings() {
+    // Load NIFTY settings
+    fetch('/admin/get-expiry/NIFTY')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.data.current_expiry) {
+                document.getElementById('niftyExpiry').value = data.data.current_expiry;
+                if (data.data.next_expiry) {
+                    document.getElementById('niftyNextExpiry').value = data.data.next_expiry;
+                }
+            }
+        })
+        .catch(console.error);
+    
+    // Load BankNifty settings
+    fetch('/admin/get-expiry/BANKNIFTY')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.data.current_expiry) {
+                document.getElementById('bankniftyExpiry').value = data.data.current_expiry;
+                if (data.data.next_expiry) {
+                    document.getElementById('bankniftyNextExpiry').value = data.data.next_expiry;
+                }
+            }
+        })
+        .catch(console.error);
+}
+
+function setTodayAsExpiry() {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('niftyExpiry').value = today;
+    document.getElementById('bankniftyExpiry').value = today;
+    
+    // Set next week as next expiry
+    const nextWeek = new Date();
+    nextWeek.setDate(nextWeek.getDate() + 7);
+    const nextWeekStr = nextWeek.toISOString().split('T')[0];
+    document.getElementById('niftyNextExpiry').value = nextWeekStr;
+    document.getElementById('bankniftyNextExpiry').value = nextWeekStr;
+}
+
+function updateExpirySettings() {
+    const formData = {
+        nifty_expiry: document.getElementById('niftyExpiry').value,
+        banknifty_expiry: document.getElementById('bankniftyExpiry').value,
+        nifty_next_expiry: document.getElementById('niftyNextExpiry').value,
+        banknifty_next_expiry: document.getElementById('bankniftyNextExpiry').value
+    };
+    
+    fetch('/admin/bulk-set-expiry', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showResult('Success', data.message, 'success');
+            loadExpirySettingsTable(); // Reload table
+        } else {
+            showResult('Error', data.message, 'error');
+        }
+    })
+    .catch(error => {
+        showResult('Error', 'Network error: ' + error.message, 'error');
+    });
+}
+
+function loadExpirySettingsTable() {
+    const tableBody = document.querySelector('#expirySettingsTable tbody');
+    
+    // Load both underlyings
+    Promise.all([
+        fetch('/admin/get-expiry/NIFTY').then(r => r.json()),
+        fetch('/admin/get-expiry/BANKNIFTY').then(r => r.json())
+    ])
+    .then(([niftyData, bankniftyData]) => {
+        let html = '';
+        
+        [niftyData, bankniftyData].forEach(data => {
+            if (data.success) {
+                const setting = data.data;
+                const isDefault = setting.is_default || false;
+                const statusBadge = isDefault ? 
+                    '<span class="badge bg-warning">Default</span>' : 
+                    '<span class="badge bg-success">Custom</span>';
+                
+                html += `
+                    <tr>
+                        <td><strong>${setting.underlying}</strong></td>
+                        <td>${setting.current_expiry}</td>
+                        <td>${setting.next_expiry || 'Not set'}</td>
+                        <td>${setting.updated_at ? new Date(new Date(setting.updated_at).getTime() + (5.5 * 60 * 60 * 1000)).toLocaleString('en-IN', {
+                            year: 'numeric',
+                            month: '2-digit', 
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                            hour12: false
+                        }) + ' IST' : 'Default'}</td>
+                        <td>${statusBadge}</td>
+                        <td>
+                            <button class="btn btn-sm btn-danger" onclick="resetExpiry('${setting.underlying}')">
+                                <i class="fas fa-undo"></i> Reset
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }
+        });
+        
+        tableBody.innerHTML = html;
+    })
+    .catch(console.error);
+}
+
+function resetExpiry(underlying) {
+    if (confirm(`Reset ${underlying} expiry to auto-calculated default?`)) {
+        fetch(`/admin/reset-expiry/${underlying}`, { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showResult('Success', data.message, 'success');
+                    loadExpirySettingsTable();
+                    loadCurrentSettings();
+                } else {
+                    showResult('Error', data.message, 'error');
+                }
+            })
+            .catch(error => {
+                showResult('Error', 'Network error: ' + error.message, 'error');
+            });
+    }
+}
+
+function showResult(title, message, type) {
+    const modal = new bootstrap.Modal(document.getElementById('resultModal'));
+    const titleEl = document.getElementById('resultModalTitle');
+    const bodyEl = document.getElementById('resultModalBody');
+    
+    titleEl.textContent = title;
+    titleEl.className = type === 'success' ? 'text-success' : 'text-danger';
+    bodyEl.innerHTML = `<div class="alert alert-${type === 'success' ? 'success' : 'danger'}">${message}</div>`;
+    
+    modal.show();
+}
+</script>
+
+<style>
+.card {
+    border: none;
+    box-shadow: 0 0 15px rgba(0,0,0,0.1);
+}
+
+.table th {
+    border-top: none;
+}
+
+.form-control:focus {
+    border-color: #80bdff;
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,0.25);
+}
+
+.btn-primary {
+    background: linear-gradient(45deg, #007bff, #0056b3);
+    border: none;
+}
+
+.btn-primary:hover {
+    background: linear-gradient(45deg, #0056b3, #004085);
+}
+</style>
+{% endblock %}

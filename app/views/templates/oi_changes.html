@@ -1,0 +1,426 @@
+{% extends "base.html" %}
+
+{% block title %}OI Changes - Top Active{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2 class="text-primary mb-0">
+                    <i class="fas fa-chart-line me-2"></i>OI Changes - Top Active
+                </h2>
+                <div class="text-muted">
+                    <i class="fas fa-clock me-1"></i>
+                    Last Updated: <span id="lastUpdated">{{ format_ist_time(current_time) }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if error %}
+    <div class="alert alert-warning" role="alert">
+        <i class="fas fa-exclamation-triangle me-2"></i>{{ error }}
+    </div>
+    {% endif %}
+
+    <!-- Refresh Button -->
+    <div class="row mb-3">
+        <div class="col-12">
+            <button class="btn btn-success" onclick="refreshData()">
+                <i class="fas fa-sync-alt me-1"></i>Refresh Data
+            </button>
+        </div>
+    </div>
+
+    <!-- CE (Call) OI Changes -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card border-success">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-arrow-up me-2"></i>CE Top OI Increases
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Strike</th>
+                                    <th>OI Change</th>
+                                    <th>Current OI</th>
+                                    <th>LTP</th>
+                                    <th>Time (IST)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ceIncreases">
+                                {% if oi_data and oi_data.ce_increases %}
+                                    {% for record in oi_data.ce_increases[:3] %}
+                                    <tr>
+                                        <td>
+                                            {% if loop.index == 1 %}
+                                                <span class="badge bg-warning text-dark">1st</span>
+                                            {% elif loop.index == 2 %}
+                                                <span class="badge bg-secondary">2nd</span>
+                                            {% elif loop.index == 3 %}
+                                                <span class="badge bg-info text-dark">3rd</span>
+                                            {% endif %}
+                                        </td>
+                                        <td><strong>{{ "%.0f"|format(record.strike_price) }}</strong></td>
+                                        <td>
+                                            <span class="text-success fw-bold">
+                                                +{{ "{:,}".format(record.ce_oi_change|int) }}
+                                            </span>
+                                        </td>
+                                        <td>{{ "{:,}".format(record.ce_oi|int) }}</td>
+                                        <td>{{ "%.2f"|format(record.ce_ltp) }}</td>
+                                        <td>{{ format_ist_time_only(record.timestamp) }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="6" class="text-center text-muted">
+                                            No significant CE OI increases found
+                                        </td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-arrow-down me-2"></i>CE Top OI Decreases
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Strike</th>
+                                    <th>OI Change</th>
+                                    <th>Current OI</th>
+                                    <th>LTP</th>
+                                    <th>Time (IST)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ceDecreases">
+                                {% if oi_data and oi_data.ce_decreases %}
+                                    {% for record in oi_data.ce_decreases[:3] %}
+                                    <tr>
+                                        <td>
+                                            {% if loop.index == 1 %}
+                                                <span class="badge bg-warning text-dark">1st</span>
+                                            {% elif loop.index == 2 %}
+                                                <span class="badge bg-secondary">2nd</span>
+                                            {% elif loop.index == 3 %}
+                                                <span class="badge bg-info text-dark">3rd</span>
+                                            {% endif %}
+                                        </td>
+                                        <td><strong>{{ "%.0f"|format(record.strike_price) }}</strong></td>
+                                        <td>
+                                            <span class="text-danger fw-bold">
+                                                {{ "{:,}".format(record.ce_oi_change|int) }}
+                                            </span>
+                                        </td>
+                                        <td>{{ "{:,}".format(record.ce_oi|int) }}</td>
+                                        <td>{{ "%.2f"|format(record.ce_ltp) }}</td>
+                                        <td>{{ format_ist_time_only(record.timestamp) }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="6" class="text-center text-muted">
+                                            No significant CE OI decreases found
+                                        </td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PE (Put) OI Changes -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card border-success">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-arrow-up me-2"></i>PE Top OI Increases
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Strike</th>
+                                    <th>OI Change</th>
+                                    <th>Current OI</th>
+                                    <th>LTP</th>
+                                    <th>Time (IST)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="peIncreases">
+                                {% if oi_data and oi_data.pe_increases %}
+                                    {% for record in oi_data.pe_increases[:3] %}
+                                    <tr>
+                                        <td>
+                                            {% if loop.index == 1 %}
+                                                <span class="badge bg-warning text-dark">1st</span>
+                                            {% elif loop.index == 2 %}
+                                                <span class="badge bg-secondary">2nd</span>
+                                            {% elif loop.index == 3 %}
+                                                <span class="badge bg-info text-dark">3rd</span>
+                                            {% endif %}
+                                        </td>
+                                        <td><strong>{{ "%.0f"|format(record.strike_price) }}</strong></td>
+                                        <td>
+                                            <span class="text-success fw-bold">
+                                                +{{ "{:,}".format(record.pe_oi_change|int) }}
+                                            </span>
+                                        </td>
+                                        <td>{{ "{:,}".format(record.pe_oi|int) }}</td>
+                                        <td>{{ "%.2f"|format(record.pe_ltp) }}</td>
+                                        <td>{{ format_ist_time_only(record.timestamp) }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="6" class="text-center text-muted">
+                                            No significant PE OI increases found
+                                        </td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-arrow-down me-2"></i>PE Top OI Decreases
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Strike</th>
+                                    <th>OI Change</th>
+                                    <th>Current OI</th>
+                                    <th>LTP</th>
+                                    <th>Time (IST)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="peDecreases">
+                                {% if oi_data and oi_data.pe_decreases %}
+                                    {% for record in oi_data.pe_decreases[:3] %}
+                                    <tr>
+                                        <td>
+                                            {% if loop.index == 1 %}
+                                                <span class="badge bg-warning text-dark">1st</span>
+                                            {% elif loop.index == 2 %}
+                                                <span class="badge bg-secondary">2nd</span>
+                                            {% elif loop.index == 3 %}
+                                                <span class="badge bg-info text-dark">3rd</span>
+                                            {% endif %}
+                                        </td>
+                                        <td><strong>{{ "%.0f"|format(record.strike_price) }}</strong></td>
+                                        <td>
+                                            <span class="text-danger fw-bold">
+                                                {{ "{:,}".format(record.pe_oi_change|int) }}
+                                            </span>
+                                        </td>
+                                        <td>{{ "{:,}".format(record.pe_oi|int) }}</td>
+                                        <td>{{ "%.2f"|format(record.pe_ltp) }}</td>
+                                        <td>{{ format_ist_time_only(record.timestamp) }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="6" class="text-center text-muted">
+                                            No significant PE OI decreases found
+                                        </td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Stats -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-info-circle me-2"></i>Summary
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-3">
+                            <div class="border-end">
+                                <h6 class="text-success">CE Increases</h6>
+                                <span class="h4">{{ (oi_data.ce_increases|length) if oi_data else 0 }}</span>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="border-end">
+                                <h6 class="text-danger">CE Decreases</h6>
+                                <span class="h4">{{ (oi_data.ce_decreases|length) if oi_data else 0 }}</span>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="border-end">
+                                <h6 class="text-success">PE Increases</h6>
+                                <span class="h4">{{ (oi_data.pe_increases|length) if oi_data else 0 }}</span>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <h6 class="text-danger">PE Decreases</h6>
+                            <span class="h4">{{ (oi_data.pe_decreases|length) if oi_data else 0 }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function refreshData() {
+    const refreshBtn = document.querySelector('button[onclick="refreshData()"]');
+    const originalHtml = refreshBtn.innerHTML;
+    
+    // Show loading state
+    refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Refreshing...';
+    refreshBtn.disabled = true;
+    
+    fetch('/api/oi-changes')
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            
+            // Update CE Increases
+            updateTable('ceIncreases', data.ce_increases, 'ce');
+            
+            // Update CE Decreases
+            updateTable('ceDecreases', data.ce_decreases, 'ce');
+            
+            // Update PE Increases
+            updateTable('peIncreases', data.pe_increases, 'pe');
+            
+            // Update PE Decreases
+            updateTable('peDecreases', data.pe_decreases, 'pe');
+            
+            // Update timestamp (already in IST from API)
+            const istTime = new Date(data.last_updated);
+            document.getElementById('lastUpdated').textContent = 
+                istTime.toLocaleString('en-IN', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false
+                }) + ' IST';
+            
+        })
+        .catch(error => {
+            console.error('Error refreshing data:', error);
+            alert('Error refreshing data: ' + error.message);
+        })
+        .finally(() => {
+            // Reset button
+            refreshBtn.innerHTML = originalHtml;
+            refreshBtn.disabled = false;
+        });
+}
+
+function updateTable(tableId, records, type) {
+    const tbody = document.getElementById(tableId);
+    
+    if (!records || records.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" class="text-center text-muted">
+                    No significant ${type.toUpperCase()} OI changes found
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = '';
+    
+    records.slice(0, 3).forEach((record, index) => {
+        const change = type === 'ce' ? record.oi_change : record.oi_change;
+        const oi = type === 'ce' ? record.oi : record.oi;
+        const ltp = type === 'ce' ? record.ltp : record.ltp;
+        
+        const isIncrease = change > 0;
+        const changeClass = isIncrease ? 'text-success' : 'text-danger';
+        const changePrefix = isIncrease ? '+' : '';
+        
+        let rankBadge = '';
+        if (index === 0) rankBadge = '<span class="badge bg-warning text-dark">1st</span>';
+        else if (index === 1) rankBadge = '<span class="badge bg-secondary">2nd</span>';
+        else if (index === 2) rankBadge = '<span class="badge bg-info text-dark">3rd</span>';
+        
+        // Timestamp is already in IST from API
+        const istTime = new Date(record.timestamp);
+        const time = istTime.toLocaleTimeString('en-IN', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+        });
+        
+        tbody.innerHTML += `
+            <tr>
+                <td>${rankBadge}</td>
+                <td><strong>${record.strike.toFixed(0)}</strong></td>
+                <td>
+                    <span class="${changeClass} fw-bold">
+                        ${changePrefix}${Math.abs(change).toLocaleString()}
+                    </span>
+                </td>
+                <td>${oi.toLocaleString()}</td>
+                <td>${ltp.toFixed(2)}</td>
+                <td>${time}</td>
+            </tr>
+        `;
+    });
+}
+
+// Auto-refresh every 2 minutes
+setInterval(refreshData, 120000);
+</script>
+{% endblock %}

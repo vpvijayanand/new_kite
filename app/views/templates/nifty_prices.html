@@ -35,8 +35,8 @@
                             <tr>
                                 <th>#</th>
                                 <th>Date & Time</th>
-                                <th>Price (₹)</th>
-                                <th>Change (₹)</th>
+                                <th>Price</th>
+                                <th>Change</th>
                                 <th>Change (%)</th>
                             </tr>
                         </thead>
@@ -90,8 +90,16 @@ function renderTable(prices) {
         return `
             <tr>
                 <td>${index + 1}</td>
-                <td>${price.timestamp}</td>
-                <td>₹${price.price.toFixed(2)}</td>
+                <td>${new Date(new Date(price.timestamp).getTime() + (5.5 * 60 * 60 * 1000)).toLocaleString('en-IN', {
+                    year: 'numeric',
+                    month: '2-digit', 
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false
+                }) + ' IST'}</td>
+                <td>${price.price.toFixed(2)}</td>
                 <td class="${changeClass}">${changeIcon} ${price.change ? price.change.toFixed(2) : '--'}</td>
                 <td class="${changeClass}">${price.change_percent ? price.change_percent.toFixed(2) + '%' : '--'}</td>
             </tr>

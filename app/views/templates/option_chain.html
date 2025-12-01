@@ -1,0 +1,450 @@
+{% extends "base.html" %}
+
+{% block title %}{{ underlying }} Option Chain Analysis{% endblock %}
+
+{% block extra_css %}
+<style>
+.option-chain-table th, .option-chain-table td {
+    padding: 8px 12px;
+    font-size: 0.9rem;
+    border: 1px solid #dee2e6;
+}
+.option-chain-table .strike-column {
+    background-color: #f8f9fa;
+    font-weight: bold;
+    text-align: center;
+}
+.ce-column {
+    background-color: #d1ecf1;
+}
+.pe-column {
+    background-color: #f8d7da;
+}
+.positive-change {
+    color: #28a745;
+}
+.negative-change {
+    color: #dc3545;
+}
+.highlight-strike {
+    background-color: #fff3cd !important;
+    font-weight: bold;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-3">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1>📊 {{ underlying }} Option Chain Analysis</h1>
+                <div>
+                    <select id="underlyingSelect" class="form-select d-inline-block me-2" style="width: auto;">
+                        <option value="NIFTY" {% if underlying == 'NIFTY' %}selected{% endif %}>NIFTY</option>
+                        <option value="BANKNIFTY" {% if underlying == 'BANKNIFTY' %}selected{% endif %}>BANKNIFTY</option>
+                    </select>
+                    <button class="btn btn-primary" id="refreshBtn">
+                        <i class="fas fa-sync me-1"></i>Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Market Summary Row -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card border-primary">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Current Price</h6>
+                    <h3 class="text-primary" id="currentPrice">Loading...</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-success">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Bullish Sentiment</h6>
+                    <h3 class="text-success" id="bullishPercent">Loading...</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-danger">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Bearish Sentiment</h6>
+                    <h3 class="text-danger" id="bearishPercent">Loading...</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-info">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Put-Call Ratio</h6>
+                    <h3 class="text-info" id="pcrRatio">Loading...</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Key Levels Row -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card border-warning">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Max Pain Strike</h6>
+                    <h4 class="text-warning" id="maxPain">Loading...</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-success">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Support Level</h6>
+                    <h4 class="text-success" id="supportLevel">Loading...</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-danger">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Resistance Level</h6>
+                    <h4 class="text-danger" id="resistanceLevel">Loading...</h4>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Option Chain Table -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-table me-2"></i>Option Chain Data 
+                        <span class="badge bg-info ms-2" id="expiryDate">Current Expiry</span>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm option-chain-table" id="optionChainTable">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th colspan="8" class="text-center ce-column">CALL OPTIONS (CE)</th>
+                                    <th class="strike-column">STRIKE</th>
+                                    <th colspan="8" class="text-center pe-column">PUT OPTIONS (PE)</th>
+                                </tr>
+                                <tr>
+                                    <th class="ce-column">OI Change</th>
+                                    <th class="ce-column">OI</th>
+                                    <th class="ce-column">Volume</th>
+                                    <th class="ce-column">IV</th>
+                                    <th class="ce-column">LTP</th>
+                                    <th class="ce-column">Change</th>
+                                    <th class="ce-column">% Change</th>
+                                    <th class="ce-column">Bid-Ask</th>
+                                    
+                                    <th class="strike-column">Price</th>
+                                    
+                                    <th class="pe-column">Bid-Ask</th>
+                                    <th class="pe-column">% Change</th>
+                                    <th class="pe-column">Change</th>
+                                    <th class="pe-column">LTP</th>
+                                    <th class="pe-column">IV</th>
+                                    <th class="pe-column">Volume</th>
+                                    <th class="pe-column">OI</th>
+                                    <th class="pe-column">OI Change</th>
+                                </tr>
+                            </thead>
+                            <tbody id="optionChainBody">
+                                <tr>
+                                    <td colspan="17" class="text-center">Loading option chain data...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Kite API Verification Section -->
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card border-info">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-check-circle me-2"></i>Kite API Request Verification
+                        <button class="btn btn-sm btn-light float-end" type="button" data-bs-toggle="collapse" data-bs-target="#verificationSection">
+                            <i class="fas fa-eye"></i> Show/Hide
+                        </button>
+                    </h5>
+                </div>
+                <div class="collapse" id="verificationSection">
+                    <div class="card-body">
+                        <p class="text-muted mb-3">
+                            <i class="fas fa-info-circle"></i> 
+                            This section shows the exact symbols and instrument tokens used for Kite API requests. 
+                            Use this to verify that the correct options are being fetched.
+                        </p>
+                        
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered" id="verificationTable">
+                                <thead class="table-secondary">
+                                    <tr>
+                                        <th>Strike Price</th>
+                                        <th class="table-success">CE Symbol</th>
+                                        <th class="table-success">CE Instrument Token</th>
+                                        <th class="table-warning">PE Symbol</th>
+                                        <th class="table-warning">PE Instrument Token</th>
+                                        <th>Data Source</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="verificationTableBody">
+                                    <tr>
+                                        <td colspan="6" class="text-center text-muted">
+                                            Load option chain data to see API verification details...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="alert alert-info mt-3">
+                            <h6><i class="fas fa-lightbulb"></i> How to Use This Information:</h6>
+                            <ul class="mb-0">
+                                <li><strong>CE/PE Symbols:</strong> These are the exact option symbols sent to Kite API</li>
+                                <li><strong>Instrument Tokens:</strong> Unique identifiers used by Kite for each option contract</li>
+                                <li><strong>Verify Format:</strong> Check if symbols follow correct NSE format (e.g., "NIFTY25DEC0224100CE")</li>
+                                <li><strong>Debug Requests:</strong> Use these symbols to manually test Kite API calls</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Links -->
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Quick Analysis Links</h5>
+                    <div class="btn-group" role="group">
+                        <a href="/oi-analysis?underlying={{ underlying }}" class="btn btn-outline-primary">
+                            <i class="fas fa-chart-line me-2"></i>Detailed OI Analysis
+                        </a>
+                        <a href="/dashboard" class="btn btn-outline-secondary">
+                            <i class="fas fa-home me-2"></i>Back to Dashboard
+                        </a>
+                        <a href="/option-chain?underlying={% if underlying == 'NIFTY' %}BANKNIFTY{% else %}NIFTY{% endif %}" class="btn btn-outline-info">
+                            <i class="fas fa-exchange-alt me-2"></i>Switch to {% if underlying == 'NIFTY' %}BANKNIFTY{% else %}NIFTY{% endif %}
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const underlying = '{{ underlying }}';
+    const refreshBtn = document.getElementById('refreshBtn');
+    const underlyingSelect = document.getElementById('underlyingSelect');
+    
+    // Load initial data
+    loadOptionChainData();
+    
+    // Auto refresh every 30 seconds
+    setInterval(loadOptionChainData, 30000);
+    
+    // Manual refresh
+    refreshBtn.addEventListener('click', function() {
+        refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Refreshing...';
+        refreshBtn.disabled = true;
+        loadOptionChainData().finally(() => {
+            refreshBtn.innerHTML = '<i class="fas fa-sync me-1"></i>Refresh';
+            refreshBtn.disabled = false;
+        });
+    });
+    
+    // Underlying change
+    underlyingSelect.addEventListener('change', function() {
+        const newUnderlying = this.value;
+        window.location.href = `/option-chain?underlying=${newUnderlying}`;
+    });
+    
+    function loadOptionChainData() {
+        return fetch(`/api/option-chain/${underlying}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateOptionChainDisplay(data.data);
+                } else {
+                    console.error('Error loading option chain:', data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+    }
+    
+    function updateOptionChainDisplay(data) {
+        // Update summary cards
+        if (data.trend) {
+            document.getElementById('bullishPercent').textContent = data.trend.bullish_percentage + '%';
+            document.getElementById('bearishPercent').textContent = data.trend.bearish_percentage + '%';
+            document.getElementById('pcrRatio').textContent = data.trend.pcr_oi.toFixed(2);
+            document.getElementById('maxPain').textContent = data.trend.max_pain_strike.toLocaleString();
+            document.getElementById('supportLevel').textContent = data.trend.key_support_level.toLocaleString();
+            document.getElementById('resistanceLevel').textContent = data.trend.key_resistance_level.toLocaleString();
+            document.getElementById('expiryDate').textContent = data.trend.expiry_date;
+        }
+        
+        // Update option chain table
+        const tbody = document.getElementById('optionChainBody');
+        tbody.innerHTML = '';
+        
+        if (data.option_chain && data.option_chain.length > 0) {
+            data.option_chain.forEach(option => {
+                const row = createOptionRow(option);
+                tbody.appendChild(row);
+            });
+        } else {
+            const row = document.createElement('tr');
+            row.innerHTML = '<td colspan="17" class="text-center text-muted">No option chain data available</td>';
+            tbody.appendChild(row);
+        }
+        
+        // Update verification table
+        updateVerificationTable(data);
+    }
+    
+    function updateVerificationTable(data) {
+        const verificationTBody = document.getElementById('verificationTableBody');
+        verificationTBody.innerHTML = '';
+        
+        if (data.option_chain && data.option_chain.length > 0) {
+            data.option_chain.forEach(option => {
+                const row = document.createElement('tr');
+                
+                // Determine data source
+                const isDemo = data.demo_mode || false;
+                const dataSource = isDemo ? 
+                    '<span class="badge bg-warning">Demo Data</span>' : 
+                    '<span class="badge bg-success">Live API</span>';
+                
+                row.innerHTML = `
+                    <td class="fw-bold">${option.strike_price.toFixed(0)}</td>
+                    <td class="font-monospace text-success">
+                        ${option.ce_data.symbol || 'N/A'}
+                        ${option.ce_data.symbol ? '<i class="fas fa-copy ms-1 cursor-pointer" onclick="copyToClipboard(\'' + option.ce_data.symbol + '\')" title="Copy Symbol"></i>' : ''}
+                    </td>
+                    <td class="font-monospace text-success">
+                        ${option.ce_data.instrument_token || 'N/A'}
+                        ${option.ce_data.instrument_token ? '<i class="fas fa-copy ms-1 cursor-pointer" onclick="copyToClipboard(\'' + option.ce_data.instrument_token + '\')" title="Copy Token"></i>' : ''}
+                    </td>
+                    <td class="font-monospace text-warning">
+                        ${option.pe_data.symbol || 'N/A'}
+                        ${option.pe_data.symbol ? '<i class="fas fa-copy ms-1 cursor-pointer" onclick="copyToClipboard(\'' + option.pe_data.symbol + '\')" title="Copy Symbol"></i>' : ''}
+                    </td>
+                    <td class="font-monospace text-warning">
+                        ${option.pe_data.instrument_token || 'N/A'}
+                        ${option.pe_data.instrument_token ? '<i class="fas fa-copy ms-1 cursor-pointer" onclick="copyToClipboard(\'' + option.pe_data.instrument_token + '\')" title="Copy Token"></i>' : ''}
+                    </td>
+                    <td>${dataSource}</td>
+                `;
+                
+                verificationTBody.appendChild(row);
+            });
+        } else {
+            const row = document.createElement('tr');
+            row.innerHTML = '<td colspan="6" class="text-center text-muted">No verification data available</td>';
+            verificationTBody.appendChild(row);
+        }
+    }
+    
+    function createOptionRow(option) {
+        const row = document.createElement('tr');
+        
+        // Determine if this is near current price (highlighting logic)
+        const isNearPrice = Math.abs(option.strike_price - getCurrentPrice()) <= 100;
+        if (isNearPrice) {
+            row.classList.add('highlight-strike');
+        }
+        
+        row.innerHTML = `
+            <!-- CE Data -->
+            <td class="ce-column ${option.ce_data.oi_change >= 0 ? 'positive-change' : 'negative-change'}">
+                ${option.ce_data.oi_change.toLocaleString()}
+            </td>
+            <td class="ce-column">${option.ce_data.oi.toLocaleString()}</td>
+            <td class="ce-column">${option.ce_data.volume.toLocaleString()}</td>
+            <td class="ce-column">${option.ce_data.iv.toFixed(2)}%</td>
+            <td class="ce-column">${option.ce_data.ltp.toFixed(2)}</td>
+            <td class="ce-column ${option.ce_data.change >= 0 ? 'positive-change' : 'negative-change'}">
+                ${option.ce_data.change.toFixed(2)}
+            </td>
+            <td class="ce-column ${option.ce_data.change_percent >= 0 ? 'positive-change' : 'negative-change'}">
+                ${option.ce_data.change_percent.toFixed(2)}%
+            </td>
+            <td class="ce-column">-</td>
+            
+            <!-- Strike Price -->
+            <td class="strike-column">${option.strike_price.toFixed(0)}</td>
+            
+            <!-- PE Data -->
+            <td class="pe-column">-</td>
+            <td class="pe-column ${option.pe_data.change_percent >= 0 ? 'positive-change' : 'negative-change'}">
+                ${option.pe_data.change_percent.toFixed(2)}%
+            </td>
+            <td class="pe-column ${option.pe_data.change >= 0 ? 'positive-change' : 'negative-change'}">
+                ${option.pe_data.change.toFixed(2)}
+            </td>
+            <td class="pe-column">${option.pe_data.ltp.toFixed(2)}</td>
+            <td class="pe-column">${option.pe_data.iv.toFixed(2)}%</td>
+            <td class="pe-column">${option.pe_data.volume.toLocaleString()}</td>
+            <td class="pe-column">${option.pe_data.oi.toLocaleString()}</td>
+            <td class="pe-column ${option.pe_data.oi_change >= 0 ? 'positive-change' : 'negative-change'}">
+                ${option.pe_data.oi_change.toLocaleString()}
+            </td>
+        `;
+        
+        return row;
+    }
+    
+    function getCurrentPrice() {
+        // This would be updated with real current price from the API
+        return underlying === 'NIFTY' ? 24000 : 52000; // Placeholder
+    }
+});
+
+// Copy to clipboard function
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(function() {
+        // Show success message
+        const Toast = Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 2000,
+            timerProgressBar: true
+        });
+        
+        Toast.fire({
+            icon: 'success',
+            title: 'Copied to clipboard!',
+            text: text
+        });
+    }).catch(function(err) {
+        console.error('Failed to copy: ', err);
+        alert('Failed to copy to clipboard');
+    });
+}
+</script>
+{% endblock %}

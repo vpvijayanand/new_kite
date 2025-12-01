@@ -1,0 +1,600 @@
+{% extends "base.html" %}
+
+{% block title %}{{ underlying }} Open Interest Analysis{% endblock %}
+
+{% block extra_css %}
+<style>
+.oi-chart-container {
+    height: 400px;
+    position: relative;
+}
+.divergence-alert {
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 0.375rem;
+}
+.oi-table th, .oi-table td {
+    padding: 10px 15px;
+    text-align: center;
+}
+.high-activity {
+    background-color: #d1ecf1 !important;
+    font-weight: bold;
+}
+.max-pain-row {
+    background-color: #fff3cd !important;
+    font-weight: bold;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-3">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1>🔍 {{ underlying }} Open Interest Analysis</h1>
+                <div>
+                    <select id="underlyingSelect" class="form-select d-inline-block me-2" style="width: auto;">
+                        <option value="NIFTY" {% if underlying == 'NIFTY' %}selected{% endif %}>NIFTY</option>
+                        <option value="BANKNIFTY" {% if underlying == 'BANKNIFTY' %}selected{% endif %}>BANKNIFTY</option>
+                    </select>
+                    <button class="btn btn-primary" id="refreshBtn">
+                        <i class="fas fa-sync me-1"></i>Refresh Data
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Section for Divergence Analysis -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card divergence-alert">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+                        Market Divergence Alerts
+                    </h5>
+                    <div id="divergenceAlerts">
+                        <p class="mb-0">Analyzing option data for potential divergence patterns...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Key OI Metrics -->
+    <div class="row mb-4">
+        <div class="col-md-2">
+            <div class="card border-primary">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Total CE OI</h6>
+                    <h4 class="text-primary" id="totalCeOi">Loading...</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card border-success">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Total PE OI</h6>
+                    <h4 class="text-success" id="totalPeOi">Loading...</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card border-info">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">CE OI Change</h6>
+                    <h4 class="text-info" id="ceOiChange">Loading...</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card border-warning">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">PE OI Change</h6>
+                    <h4 class="text-warning" id="peOiChange">Loading...</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card border-danger">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">PCR OI</h6>
+                    <h4 class="text-danger" id="pcrOi">Loading...</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card border-dark">
+                <div class="card-body text-center">
+                    <h6 class="text-muted">Max Pain</h6>
+                    <h4 class="text-dark" id="maxPainLevel">Loading...</h4>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- OI Visualization Charts -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-bar me-2"></i>OI Distribution by Strike
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="oi-chart-container">
+                        <canvas id="oiDistributionChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-line me-2"></i>OI Change Analysis
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="oi-chart-container">
+                        <canvas id="oiChangeChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detailed OI Analysis Table -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-table me-2"></i>Detailed Open Interest Analysis
+                        <span class="badge bg-secondary ms-2" id="lastUpdateTime">Live</span>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover oi-table" id="oiAnalysisTable">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Strike Price</th>
+                                    <th>CE OI</th>
+                                    <th>CE OI Change</th>
+                                    <th>CE OI % Change</th>
+                                    <th>Total OI</th>
+                                    <th>PE OI % Change</th>
+                                    <th>PE OI Change</th>
+                                    <th>PE OI</th>
+                                    <th>PCR</th>
+                                    <th>Activity Score</th>
+                                </tr>
+                            </thead>
+                            <tbody id="oiAnalysisBody">
+                                <tr>
+                                    <td colspan="10" class="text-center">Loading detailed OI analysis...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Analysis Insights -->
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card border-success">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-lightbulb me-2"></i>Key Insights
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <ul id="keyInsights" class="list-unstyled">
+                        <li><i class="fas fa-spinner fa-spin me-2"></i>Analyzing market data...</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card border-warning">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-line me-2"></i>Trading Levels
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="tradingLevels">
+                        <p><strong>Strong Support:</strong> <span id="strongSupport">Calculating...</span></p>
+                        <p><strong>Immediate Support:</strong> <span id="immediateSupport">Calculating...</span></p>
+                        <p><strong>Current Level:</strong> <span id="currentLevel">Calculating...</span></p>
+                        <p><strong>Immediate Resistance:</strong> <span id="immediateResistance">Calculating...</span></p>
+                        <p><strong>Strong Resistance:</strong> <span id="strongResistance">Calculating...</span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Navigation -->
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-0">Quick Navigation</h6>
+                            <small class="text-muted">Jump to different analysis sections</small>
+                        </div>
+                        <div class="btn-group">
+                            <a href="/option-chain?underlying={{ underlying }}" class="btn btn-outline-primary">
+                                <i class="fas fa-table me-1"></i>Option Chain
+                            </a>
+                            <a href="/dashboard" class="btn btn-outline-secondary">
+                                <i class="fas fa-home me-1"></i>Dashboard
+                            </a>
+                            <button class="btn btn-outline-info" onclick="exportAnalysis()">
+                                <i class="fas fa-download me-1"></i>Export Data
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const underlying = '{{ underlying }}';
+    let oiDistributionChart, oiChangeChart;
+    
+    // Initialize charts
+    initializeCharts();
+    
+    // Load initial data
+    loadOIAnalysis();
+    
+    // Auto refresh every 45 seconds
+    setInterval(loadOIAnalysis, 45000);
+    
+    // Event listeners
+    document.getElementById('refreshBtn').addEventListener('click', function() {
+        this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Refreshing...';
+        this.disabled = true;
+        loadOIAnalysis().finally(() => {
+            this.innerHTML = '<i class="fas fa-sync me-1"></i>Refresh Data';
+            this.disabled = false;
+        });
+    });
+    
+    document.getElementById('underlyingSelect').addEventListener('change', function() {
+        window.location.href = `/oi-analysis?underlying=${this.value}`;
+    });
+    
+    function loadOIAnalysis() {
+        return fetch(`/api/oi-analysis/${underlying}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateOIDisplay(data.data);
+                    updateLastUpdateTime();
+                } else {
+                    console.error('Error loading OI analysis:', data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+    }
+    
+    function updateOIDisplay(data) {
+        if (!data || data.length === 0) return;
+        
+        // Calculate totals and metrics
+        const metrics = calculateMetrics(data);
+        updateMetricCards(metrics);
+        updateCharts(data, metrics);
+        updateAnalysisTable(data);
+        updateInsights(data, metrics);
+        analyzeDivergence(data);
+        updateSupportResistanceLevels(data, metrics);
+    }
+    
+    function calculateMetrics(data) {
+        let totalCeOi = 0, totalPeOi = 0, totalCeOiChange = 0, totalPeOiChange = 0;
+        let maxTotalOi = 0, maxPainStrike = 0;
+        
+        data.forEach(item => {
+            totalCeOi += item.ce_data.oi;
+            totalPeOi += item.pe_data.oi;
+            totalCeOiChange += item.ce_data.oi_change;
+            totalPeOiChange += item.pe_data.oi_change;
+            
+            const totalOi = item.ce_data.oi + item.pe_data.oi;
+            if (totalOi > maxTotalOi) {
+                maxTotalOi = totalOi;
+                maxPainStrike = item.strike_price;
+            }
+        });
+        
+        return {
+            totalCeOi,
+            totalPeOi,
+            totalCeOiChange,
+            totalPeOiChange,
+            pcr: totalPeOi / totalCeOi,
+            maxPainStrike
+        };
+    }
+    
+    function updateMetricCards(metrics) {
+        document.getElementById('totalCeOi').textContent = formatNumber(metrics.totalCeOi);
+        document.getElementById('totalPeOi').textContent = formatNumber(metrics.totalPeOi);
+        document.getElementById('ceOiChange').textContent = formatChange(metrics.totalCeOiChange);
+        document.getElementById('peOiChange').textContent = formatChange(metrics.totalPeOiChange);
+        document.getElementById('pcrOi').textContent = metrics.pcr.toFixed(2);
+        document.getElementById('maxPainLevel').textContent = metrics.maxPainStrike.toLocaleString();
+    }
+    
+    function updateAnalysisTable(data) {
+        const tbody = document.getElementById('oiAnalysisBody');
+        tbody.innerHTML = '';
+        
+        data.forEach(item => {
+            const row = createAnalysisRow(item);
+            tbody.appendChild(row);
+        });
+    }
+    
+    function createAnalysisRow(item) {
+        const row = document.createElement('tr');
+        
+        const totalOi = item.ce_data.oi + item.pe_data.oi;
+        const pcr = item.pe_data.oi / item.ce_data.oi || 0;
+        const activityScore = Math.abs(item.ce_data.oi_change) + Math.abs(item.pe_data.oi_change);
+        
+        // Highlight high activity rows
+        if (activityScore > 50000) {
+            row.classList.add('high-activity');
+        }
+        
+        row.innerHTML = `
+            <td><strong>${item.strike_price.toFixed(0)}</strong></td>
+            <td>${item.ce_data.oi.toLocaleString()}</td>
+            <td class="${item.ce_data.oi_change >= 0 ? 'text-success' : 'text-danger'}">
+                ${item.ce_data.oi_change.toLocaleString()}
+            </td>
+            <td class="${item.ce_data.oi_change >= 0 ? 'text-success' : 'text-danger'}">
+                ${calculatePercentChange(item.ce_data.oi, item.ce_data.oi_change).toFixed(1)}%
+            </td>
+            <td><strong>${totalOi.toLocaleString()}</strong></td>
+            <td class="${item.pe_data.oi_change >= 0 ? 'text-success' : 'text-danger'}">
+                ${calculatePercentChange(item.pe_data.oi, item.pe_data.oi_change).toFixed(1)}%
+            </td>
+            <td class="${item.pe_data.oi_change >= 0 ? 'text-success' : 'text-danger'}">
+                ${item.pe_data.oi_change.toLocaleString()}
+            </td>
+            <td>${item.pe_data.oi.toLocaleString()}</td>
+            <td>${pcr.toFixed(2)}</td>
+            <td><span class="badge ${activityScore > 100000 ? 'bg-danger' : activityScore > 50000 ? 'bg-warning' : 'bg-secondary'}">${activityScore.toLocaleString()}</span></td>
+        `;
+        
+        return row;
+    }
+    
+    function initializeCharts() {
+        // OI Distribution Chart
+        const ctx1 = document.getElementById('oiDistributionChart').getContext('2d');
+        oiDistributionChart = new Chart(ctx1, {
+            type: 'bar',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Call OI',
+                    data: [],
+                    backgroundColor: 'rgba(220, 53, 69, 0.6)',  // Red - indicates downtrend
+                    borderColor: 'rgba(220, 53, 69, 1)',
+                    borderWidth: 1
+                }, {
+                    label: 'Put OI',
+                    data: [],
+                    backgroundColor: 'rgba(25, 135, 84, 0.6)',  // Green - indicates uptrend
+                    borderColor: 'rgba(25, 135, 84, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+        
+        // OI Change Chart
+        const ctx2 = document.getElementById('oiChangeChart').getContext('2d');
+        oiChangeChart = new Chart(ctx2, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Call OI Change',
+                    data: [],
+                    borderColor: 'rgba(220, 53, 69, 1)',      // Red - indicates downtrend
+                    backgroundColor: 'rgba(220, 53, 69, 0.2)',
+                    tension: 0.1
+                }, {
+                    label: 'Put OI Change',
+                    data: [],
+                    borderColor: 'rgba(25, 135, 84, 1)',      // Green - indicates uptrend
+                    backgroundColor: 'rgba(25, 135, 84, 0.2)',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+    
+    function updateCharts(data, metrics) {
+        // Update OI Distribution Chart
+        const strikes = data.map(item => item.strike_price);
+        const ceOIs = data.map(item => item.ce_data.oi);
+        const peOIs = data.map(item => item.pe_data.oi);
+        
+        oiDistributionChart.data.labels = strikes;
+        oiDistributionChart.data.datasets[0].data = ceOIs;
+        oiDistributionChart.data.datasets[1].data = peOIs;
+        oiDistributionChart.update();
+        
+        // Update OI Change Chart
+        const ceChanges = data.map(item => item.ce_data.oi_change);
+        const peChanges = data.map(item => item.pe_data.oi_change);
+        
+        oiChangeChart.data.labels = strikes;
+        oiChangeChart.data.datasets[0].data = ceChanges;
+        oiChangeChart.data.datasets[1].data = peChanges;
+        oiChangeChart.update();
+    }
+    
+    function updateSupportResistanceLevels(data, metrics) {
+        // Sort data by strike price for level analysis
+        const sortedData = [...data].sort((a, b) => a.strike_price - b.strike_price);
+        
+        // Find highest OI strikes for support/resistance
+        const oiLevels = sortedData.map(item => ({
+            strike: item.strike_price,
+            totalOI: item.ce_data.oi + item.pe_data.oi,
+            ceOI: item.ce_data.oi,
+            peOI: item.pe_data.oi
+        })).sort((a, b) => b.totalOI - a.totalOI);
+        
+        // Get current price estimate (use max pain as reference)
+        const currentPrice = metrics.maxPainStrike;
+        
+        // Find support levels (strikes below current with high PE OI)
+        const supportLevels = sortedData
+            .filter(item => item.strike_price < currentPrice)
+            .sort((a, b) => b.pe_data.oi - a.pe_data.oi)
+            .slice(0, 3);
+            
+        // Find resistance levels (strikes above current with high CE OI)  
+        const resistanceLevels = sortedData
+            .filter(item => item.strike_price > currentPrice)
+            .sort((a, b) => b.ce_data.oi - a.ce_data.oi)
+            .slice(0, 3);
+        
+        // Update UI elements
+        document.getElementById('strongSupport').textContent = 
+            supportLevels.length > 1 ? `${supportLevels[1].strike_price.toFixed(0)}` : 'N/A';
+        document.getElementById('immediateSupport').textContent = 
+            supportLevels.length > 0 ? `${supportLevels[0].strike_price.toFixed(0)}` : 'N/A';
+        document.getElementById('currentLevel').textContent = `${currentPrice.toFixed(0)}`;
+        document.getElementById('immediateResistance').textContent = 
+            resistanceLevels.length > 0 ? `${resistanceLevels[0].strike_price.toFixed(0)}` : 'N/A';
+        document.getElementById('strongResistance').textContent = 
+            resistanceLevels.length > 1 ? `${resistanceLevels[1].strike_price.toFixed(0)}` : 'N/A';
+    }
+
+    function updateInsights(data, metrics) {
+        const insights = [];
+        
+        // PCR Analysis
+        if (metrics.pcr > 1.2) {
+            insights.push('<i class="fas fa-arrow-up text-success me-2"></i>High PCR (' + metrics.pcr.toFixed(2) + ') suggests bullish sentiment');
+        } else if (metrics.pcr < 0.8) {
+            insights.push('<i class="fas fa-arrow-down text-danger me-2"></i>Low PCR (' + metrics.pcr.toFixed(2) + ') suggests bearish sentiment');
+        } else {
+            insights.push('<i class="fas fa-balance-scale text-info me-2"></i>Neutral PCR (' + metrics.pcr.toFixed(2) + ') indicates balanced market');
+        }
+        
+        // Max Pain Analysis
+        insights.push('<i class="fas fa-target text-warning me-2"></i>Max Pain at ' + metrics.maxPainStrike.toLocaleString() + ' suggests price magnet');
+        
+        // OI Change Analysis
+        if (Math.abs(metrics.totalCeOiChange) > Math.abs(metrics.totalPeOiChange)) {
+            insights.push('<i class="fas fa-chart-line text-primary me-2"></i>Higher Call activity suggests institutional positioning');
+        } else {
+            insights.push('<i class="fas fa-chart-line text-success me-2"></i>Higher Put activity indicates hedging or bearish bets');
+        }
+        
+        document.getElementById('keyInsights').innerHTML = insights.map(insight => '<li>' + insight + '</li>').join('');
+    }
+    
+    function analyzeDivergence(data) {
+        const alerts = [];
+        
+        // Look for unusual OI patterns
+        data.forEach(item => {
+            const totalActivity = Math.abs(item.ce_data.oi_change) + Math.abs(item.pe_data.oi_change);
+            if (totalActivity > 100000) {
+                alerts.push(`High activity at ${item.strike_price.toFixed(0)} strike`);
+            }
+        });
+        
+        if (alerts.length === 0) {
+            alerts.push('No significant divergence patterns detected in current data');
+        }
+        
+        document.getElementById('divergenceAlerts').innerHTML = 
+            alerts.map(alert => '<div class="alert alert-warning mb-2 py-2">' + alert + '</div>').join('');
+    }
+    
+    function updateLastUpdateTime() {
+        const now = new Date();
+        const istTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+        document.getElementById('lastUpdateTime').textContent = istTime.toLocaleTimeString('en-IN', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        }) + ' IST';
+    }
+    
+    function formatNumber(num) {
+        if (num >= 1000000) {
+            return (num / 1000000).toFixed(1) + 'M';
+        } else if (num >= 1000) {
+            return (num / 1000).toFixed(0) + 'K';
+        }
+        return num.toLocaleString();
+    }
+    
+    function formatChange(change) {
+        const sign = change >= 0 ? '+' : '';
+        return sign + formatNumber(change);
+    }
+    
+    function calculatePercentChange(current, change) {
+        const previous = current - change;
+        return previous !== 0 ? (change / previous) * 100 : 0;
+    }
+});
+
+function exportAnalysis() {
+    // This would implement data export functionality
+    alert('Export functionality would be implemented here');
+}
+</script>
+{% endblock %}

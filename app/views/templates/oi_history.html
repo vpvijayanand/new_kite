@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+
+{% block title %}OI History Analysis{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-history text-info"></i> OI Change History Analysis</h2>
+                <div class="text-muted">
+                    <i class="fas fa-clock"></i> Last Updated: <span id="lastUpdated">{{ format_ist_time(current_time) }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Selection Controls -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card border-primary">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-filter"></i> Select Strike Price & Option Type</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label for="strikeSelect" class="form-label">Strike Price</label>
+                            <select class="form-select" id="strikeSelect">
+                                <option value="">Select Strike Price</option>
+                                {% for strike in available_strikes %}
+                                <option value="{{ strike }}">{{ strike }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="optionTypeSelect" class="form-label">Option Type</label>
+                            <select class="form-select" id="optionTypeSelect">
+                                <option value="">Select Option Type</option>
+                                <option value="CE">Call (CE)</option>
+                                <option value="PE">Put (PE)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <button class="btn btn-success w-100" id="loadHistoryBtn" disabled>
+                                <i class="fas fa-search"></i> Load History
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div id="loadingSpinner" class="text-center d-none">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-2">Loading OI History...</p>
+    </div>
+
+    <!-- Summary Section -->
+    <div id="summarySection" class="row mb-4 d-none">
+        <div class="col-md-12">
+            <div class="card border-success">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-chart-line"></i> Day Summary</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-2">
+                            <h6>Strike Price</h6>
+                            <span class="badge bg-primary fs-6" id="summaryStrike">-</span>
+                        </div>
+                        <div class="col-md-2">
+                            <h6>Option Type</h6>
+                            <span class="badge bg-info fs-6" id="summaryType">-</span>
+                        </div>
+                        <div class="col-md-2">
+                            <h6>Total OI Change</h6>
+                            <span id="totalOiChange" class="fs-5 fw-bold">-</span>
+                            <br>
+                            <small class="text-muted">(<span id="totalOiChangePercent">-</span>%)</small>
+                        </div>
+                        <div class="col-md-2">
+                            <h6>Price Change</h6>
+                            <span id="totalPriceChange" class="fs-5 fw-bold">-</span>
+                            <br>
+                            <small class="text-muted">(<span id="totalPriceChangePercent">-</span>%)</small>
+                        </div>
+                        <div class="col-md-2">
+                            <h6>Start OI</h6>
+                            <span id="startOi" class="fs-6">-</span>
+                            <br>
+                            <small class="text-muted" id="startTime">-</small>
+                        </div>
+                        <div class="col-md-2">
+                            <h6>Current OI</h6>
+                            <span id="currentOi" class="fs-6">-</span>
+                            <br>
+                            <small class="text-muted" id="currentTime">-</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- History Table -->
+    <div id="historySection" class="row d-none">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-table"></i> OI Change Timeline (Only Changes Shown)</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped mb-0" id="historyTable">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Current OI</th>
+                                    <th>Interval Change</th>
+                                    <th>Total Change from Start</th>
+                                    <th>Change % from Start</th>
+                                    <th>LTP</th>
+                                </tr>
+                            </thead>
+                            <tbody id="historyTableBody">
+                                <!-- History data will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- No Data Message -->
+    <div id="noDataSection" class="row d-none">
+        <div class="col-md-12">
+            <div class="alert alert-warning text-center">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h5>No Data Available</h5>
+                <p class="mb-0">No OI change data found for the selected strike price and option type for today.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const strikeSelect = document.getElementById('strikeSelect');
+    const optionTypeSelect = document.getElementById('optionTypeSelect');
+    const loadHistoryBtn = document.getElementById('loadHistoryBtn');
+    
+    // Enable/disable load button based on selections
+    function updateLoadButton() {
+        const strikeSelected = strikeSelect.value !== '';
+        const typeSelected = optionTypeSelect.value !== '';
+        loadHistoryBtn.disabled = !(strikeSelected && typeSelected);
+    }
+    
+    strikeSelect.addEventListener('change', updateLoadButton);
+    optionTypeSelect.addEventListener('change', updateLoadButton);
+    
+    // Load history data
+    loadHistoryBtn.addEventListener('click', function() {
+        const strike = strikeSelect.value;
+        const optionType = optionTypeSelect.value;
+        
+        if (!strike || !optionType) return;
+        
+        loadOiHistory(strike, optionType);
+    });
+    
+    function loadOiHistory(strike, optionType) {
+        // Show loading spinner
+        document.getElementById('loadingSpinner').classList.remove('d-none');
+        document.getElementById('summarySection').classList.add('d-none');
+        document.getElementById('historySection').classList.add('d-none');
+        document.getElementById('noDataSection').classList.add('d-none');
+        
+        fetch(`/api/oi-history/${strike}/${optionType}`)
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('loadingSpinner').classList.add('d-none');
+                
+                if (data.success) {
+                    displayHistoryData(data);
+                } else {
+                    showNoDataMessage(data.message || 'Failed to load data');
+                }
+            })
+            .catch(error => {
+                document.getElementById('loadingSpinner').classList.add('d-none');
+                showNoDataMessage('Error loading data: ' + error.message);
+                console.error('Error:', error);
+            });
+    }
+    
+    function displayHistoryData(data) {
+        const summary = data.summary;
+        const history = data.history;
+        
+        // Update summary
+        document.getElementById('summaryStrike').textContent = data.strike_price;
+        document.getElementById('summaryType').textContent = data.option_type;
+        document.getElementById('totalOiChange').textContent = formatNumber(summary.total_oi_change);
+        document.getElementById('totalOiChangePercent').textContent = summary.total_oi_change_percent;
+        document.getElementById('totalPriceChange').textContent = summary.total_price_change;
+        document.getElementById('totalPriceChangePercent').textContent = summary.total_price_change_percent;
+        document.getElementById('startOi').textContent = formatNumber(summary.first_oi);
+        document.getElementById('currentOi').textContent = formatNumber(summary.latest_oi);
+        document.getElementById('startTime').textContent = summary.first_time;
+        document.getElementById('currentTime').textContent = summary.latest_time;
+        
+        // Color code the changes
+        const totalOiChangeElement = document.getElementById('totalOiChange');
+        const totalPriceChangeElement = document.getElementById('totalPriceChange');
+        
+        totalOiChangeElement.className = summary.total_oi_change > 0 ? 'fs-5 fw-bold text-success' : 
+                                        summary.total_oi_change < 0 ? 'fs-5 fw-bold text-danger' : 'fs-5 fw-bold';
+        
+        totalPriceChangeElement.className = summary.total_price_change > 0 ? 'fs-5 fw-bold text-success' : 
+                                           summary.total_price_change < 0 ? 'fs-5 fw-bold text-danger' : 'fs-5 fw-bold';
+        
+        // Populate history table
+        const tbody = document.getElementById('historyTableBody');
+        tbody.innerHTML = '';
+        
+        history.forEach(record => {
+            const row = document.createElement('tr');
+            
+            const changeClass = record.oi_change > 0 ? 'text-success' : 
+                               record.oi_change < 0 ? 'text-danger' : '';
+            
+            const totalChangeClass = record.oi_change_from_start > 0 ? 'text-success' : 
+                                    record.oi_change_from_start < 0 ? 'text-danger' : '';
+            
+            row.innerHTML = `
+                <td>${record.timestamp}</td>
+                <td>${formatNumber(record.oi)}</td>
+                <td class="${changeClass}">
+                    ${record.oi_change > 0 ? '+' : ''}${formatNumber(record.oi_change)}
+                </td>
+                <td class="${totalChangeClass}">
+                    ${record.oi_change_from_start > 0 ? '+' : ''}${formatNumber(record.oi_change_from_start)}
+                </td>
+                <td class="${totalChangeClass}">
+                    ${record.oi_change_percent_from_start > 0 ? '+' : ''}${record.oi_change_percent_from_start}%
+                </td>
+                <td>₹${record.ltp}</td>
+            `;
+            
+            tbody.appendChild(row);
+        });
+        
+        // Show sections
+        document.getElementById('summarySection').classList.remove('d-none');
+        document.getElementById('historySection').classList.remove('d-none');
+    }
+    
+    function showNoDataMessage(message) {
+        document.getElementById('noDataSection').classList.remove('d-none');
+        if (message) {
+            document.querySelector('#noDataSection p').textContent = message;
+        }
+    }
+    
+    function formatNumber(num) {
+        return new Intl.NumberFormat('en-IN').format(num);
+    }
+});
+</script>
+{% endblock %}

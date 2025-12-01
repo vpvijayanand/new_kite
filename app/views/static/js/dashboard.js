@@ -13,7 +13,7 @@ function loadCurrentPrice() {
 }
 
 function updateCurrentPrice(priceData) {
-    document.getElementById('currentPrice').textContent = `₹${priceData.price.toFixed(2)}`;
+    document.getElementById('currentPrice').textContent = `${priceData.price.toFixed(2)}`;
     
     const changeElement = document.getElementById('priceChange');
     const change = priceData.change || 0;
@@ -28,7 +28,16 @@ function updateCurrentPrice(priceData) {
     }
     
     const now = new Date();
-    document.getElementById('lastUpdate').textContent = `Last updated: ${now.toLocaleString()}`;
+    const istTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+    document.getElementById('lastUpdate').textContent = `Last updated: ${istTime.toLocaleString('en-IN', {
+        year: 'numeric',
+        month: '2-digit', 
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+    })} IST`;
 }
 
 function loadRecentPrices() {
@@ -57,8 +66,16 @@ function updateRecentPrices(prices) {
         
         return `
             <tr>
-                <td>${price.timestamp}</td>
-                <td>₹${price.price.toFixed(2)}</td>
+                <td>${new Date(new Date(price.timestamp).getTime() + (5.5 * 60 * 60 * 1000)).toLocaleString('en-IN', {
+                    year: 'numeric',
+                    month: '2-digit', 
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false
+                }) + ' IST'}</td>
+                <td>${price.price.toFixed(2)}</td>
                 <td class="${changeClass}">${changeIcon} ${price.change ? price.change.toFixed(2) : '--'}</td>
                 <td class="${changeClass}">${price.change_percent ? price.change_percent.toFixed(2) + '%' : '--'}</td>
             </tr>
@@ -75,8 +92,8 @@ function updateStats(prices) {
     const high = Math.max(...priceValues);
     const low = Math.min(...priceValues);
     
-    document.getElementById('todayHigh').textContent = `₹${high.toFixed(2)}`;
-    document.getElementById('todayLow').textContent = `₹${low.toFixed(2)}`;
+    document.getElementById('todayHigh').textContent = `${high.toFixed(2)}`;
+    document.getElementById('todayLow').textContent = `${low.toFixed(2)}`;
 }
 
 // Refresh button
