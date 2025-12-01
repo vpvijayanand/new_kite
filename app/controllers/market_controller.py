@@ -216,3 +216,10 @@ def oi_history_page():
     """Display OI history analysis page"""
     from app.controllers.oi_controller import oi_history
     return oi_history()
+
+@market_bp.route('/strategy-analysis')
+@login_required
+def strategy_analysis_page():
+    """Display strategy analysis page"""
+    return render_template('strategy_analysis.html', 
+                         current_time=datetime.now())

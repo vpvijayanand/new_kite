@@ -1,0 +1,386 @@
+{% extends "base.html" %}
+
+{% block title %}Strategy Analysis{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-chart-bar text-success"></i> Strategy Analysis - Sell High, Buy Higher</h2>
+                <div class="text-muted">
+                    <i class="fas fa-clock"></i> Last Updated: <span id="lastUpdated">{{ format_ist_time(current_time) }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Strategy Description -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="alert alert-info">
+                <h5><i class="fas fa-info-circle"></i> Strategy Overview</h5>
+                <p class="mb-2"><strong>Sell High Strike + Buy Higher Strike Strategy:</strong></p>
+                <div class="row">
+                    <div class="col-md-6">
+                        <strong>Call Options (CE):</strong>
+                        <ul class="mb-0">
+                            <li>Sell CE at higher strike (e.g., 26100 when market at 26000)</li>
+                            <li>Buy CE at even higher strike (e.g., 26250)</li>
+                            <li>Profit when market stays below sold strike</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Put Options (PE):</strong>
+                        <ul class="mb-0">
+                            <li>Sell PE at lower strike (e.g., 25900 when market at 26000)</li>
+                            <li>Buy PE at even lower strike (e.g., 25750)</li>
+                            <li>Profit when market stays above sold strike</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Selection Controls -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card border-primary">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-filter"></i> Analysis Parameters</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <label for="underlyingSelect" class="form-label">Underlying</label>
+                            <select class="form-select" id="underlyingSelect">
+                                <option value="">Select Underlying</option>
+                                <option value="NIFTY">NIFTY</option>
+                                <option value="BANKNIFTY">BANKNIFTY</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="strikeGapSelect" class="form-label">Strike Gap</label>
+                            <select class="form-select" id="strikeGapSelect">
+                                <option value="50">50 Points</option>
+                                <option value="100" selected>100 Points</option>
+                                <option value="150">150 Points</option>
+                                <option value="200">200 Points</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="protectionGapSelect" class="form-label">Protection Gap</label>
+                            <select class="form-select" id="protectionGapSelect">
+                                <option value="100">100 Points</option>
+                                <option value="150" selected>150 Points</option>
+                                <option value="200">200 Points</option>
+                                <option value="250">250 Points</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end">
+                            <button class="btn btn-success w-100" id="analyzeBtn" disabled>
+                                <i class="fas fa-calculator"></i> Analyze Strategies
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div id="loadingSpinner" class="text-center d-none">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-2">Analyzing Strategy Combinations...</p>
+    </div>
+
+    <!-- Results Section -->
+    <div id="resultsSection" class="row d-none">
+        <!-- Call Strategies -->
+        <div class="col-md-6">
+            <div class="card border-success mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-arrow-up"></i> Top 5 Call (CE) Strategies</h5>
+                    <small>Sell CE + Buy Higher CE</small>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0" id="ceStrategiesTable">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Sell Strike</th>
+                                    <th>Buy Strike</th>
+                                    <th>Net Premium</th>
+                                    <th>Max Profit</th>
+                                    <th>P&L Today</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ceStrategiesBody">
+                                <!-- CE strategies will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Put Strategies -->
+        <div class="col-md-6">
+            <div class="card border-danger mb-4">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0"><i class="fas fa-arrow-down"></i> Top 5 Put (PE) Strategies</h5>
+                    <small>Sell PE + Buy Lower PE</small>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0" id="peStrategiesTable">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Sell Strike</th>
+                                    <th>Buy Strike</th>
+                                    <th>Net Premium</th>
+                                    <th>Max Profit</th>
+                                    <th>P&L Today</th>
+                                </tr>
+                            </thead>
+                            <tbody id="peStrategiesBody">
+                                <!-- PE strategies will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detailed Analysis -->
+    <div id="detailedSection" class="row d-none">
+        <div class="col-md-12">
+            <div class="card border-info">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-chart-line"></i> Market Context & Analysis</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-2">
+                            <h6>Opening Price</h6>
+                            <span class="badge bg-primary fs-6" id="openPrice">-</span>
+                        </div>
+                        <div class="col-md-2">
+                            <h6>Current Price</h6>
+                            <span class="badge bg-info fs-6" id="currentPrice">-</span>
+                        </div>
+                        <div class="col-md-2">
+                            <h6>Day High</h6>
+                            <span class="badge bg-success fs-6" id="dayHigh">-</span>
+                        </div>
+                        <div class="col-md-2">
+                            <h6>Day Low</h6>
+                            <span class="badge bg-danger fs-6" id="dayLow">-</span>
+                        </div>
+                        <div class="col-md-2">
+                            <h6>Day Range</h6>
+                            <span class="badge bg-secondary fs-6" id="dayRange">-</span>
+                        </div>
+                        <div class="col-md-2">
+                            <h6>Volatility</h6>
+                            <span class="badge bg-warning fs-6" id="volatility">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Strategy Explanation -->
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="alert alert-secondary">
+                <h6 class="mb-2"><i class="fas fa-lightbulb"></i> Strategy Explanation:</h6>
+                <div class="row">
+                    <div class="col-md-6">
+                        <strong>Call Strategy Profit Conditions:</strong>
+                        <ul class="mb-2">
+                            <li><span class="text-success">Maximum Profit:</span> When market stays below sold strike</li>
+                            <li><span class="text-warning">Partial Profit:</span> When market between sold and bought strikes</li>
+                            <li><span class="text-danger">Maximum Loss:</span> When market goes above bought strike</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Put Strategy Profit Conditions:</strong>
+                        <ul class="mb-2">
+                            <li><span class="text-success">Maximum Profit:</span> When market stays above sold strike</li>
+                            <li><span class="text-warning">Partial Profit:</span> When market between bought and sold strikes</li>
+                            <li><span class="text-danger">Maximum Loss:</span> When market goes below bought strike</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- No Data Message -->
+    <div id="noDataSection" class="row d-none">
+        <div class="col-md-12">
+            <div class="alert alert-warning text-center">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h5>No Data Available</h5>
+                <p class="mb-0">No option data available for strategy analysis.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const underlyingSelect = document.getElementById('underlyingSelect');
+    const strikeGapSelect = document.getElementById('strikeGapSelect');
+    const protectionGapSelect = document.getElementById('protectionGapSelect');
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    
+    // Enable analyze button when underlying is selected
+    underlyingSelect.addEventListener('change', function() {
+        analyzeBtn.disabled = this.value === '';
+    });
+    
+    // Analyze strategies
+    analyzeBtn.addEventListener('click', function() {
+        const underlying = underlyingSelect.value;
+        const strikeGap = parseInt(strikeGapSelect.value);
+        const protectionGap = parseInt(protectionGapSelect.value);
+        
+        if (!underlying) return;
+        
+        analyzeStrategies(underlying, strikeGap, protectionGap);
+    });
+    
+    function analyzeStrategies(underlying, strikeGap, protectionGap) {
+        // Show loading
+        document.getElementById('loadingSpinner').classList.remove('d-none');
+        document.getElementById('resultsSection').classList.add('d-none');
+        document.getElementById('detailedSection').classList.add('d-none');
+        document.getElementById('noDataSection').classList.add('d-none');
+        
+        // Fetch strategy analysis
+        fetch(`/api/strategy-analysis/${underlying}/${strikeGap}/${protectionGap}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                document.getElementById('loadingSpinner').classList.add('d-none');
+                
+                if (data.success) {
+                    displayResults(data);
+                } else {
+                    showNoDataMessage(data.message || 'Failed to analyze strategies');
+                }
+            })
+            .catch(error => {
+                document.getElementById('loadingSpinner').classList.add('d-none');
+                showNoDataMessage('Error analyzing strategies: ' + error.message);
+                console.error('Error:', error);
+            });
+    }
+    
+    function displayResults(data) {
+        // Populate CE strategies
+        const ceBody = document.getElementById('ceStrategiesBody');
+        ceBody.innerHTML = '';
+        
+        if (data.ce_strategies && data.ce_strategies.length > 0) {
+            data.ce_strategies.forEach((strategy, index) => {
+                const row = createStrategyRow(strategy, index + 1, 'CE');
+                ceBody.appendChild(row);
+            });
+        } else {
+            ceBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No CE strategies available</td></tr>';
+        }
+        
+        // Populate PE strategies
+        const peBody = document.getElementById('peStrategiesBody');
+        peBody.innerHTML = '';
+        
+        if (data.pe_strategies && data.pe_strategies.length > 0) {
+            data.pe_strategies.forEach((strategy, index) => {
+                const row = createStrategyRow(strategy, index + 1, 'PE');
+                peBody.appendChild(row);
+            });
+        } else {
+            peBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No PE strategies available</td></tr>';
+        }
+        
+        // Update market context
+        if (data.market_context) {
+            const context = data.market_context;
+            document.getElementById('openPrice').textContent = '₹' + formatNumber(context.open_price || 0);
+            document.getElementById('currentPrice').textContent = '₹' + formatNumber(context.current_price || 0);
+            document.getElementById('dayHigh').textContent = '₹' + formatNumber(context.day_high || 0);
+            document.getElementById('dayLow').textContent = '₹' + formatNumber(context.day_low || 0);
+            document.getElementById('dayRange').textContent = formatNumber(context.day_range || 0);
+            document.getElementById('volatility').textContent = (context.volatility || 0).toFixed(2) + '%';
+        }
+        
+        // Show results
+        document.getElementById('resultsSection').classList.remove('d-none');
+        document.getElementById('detailedSection').classList.remove('d-none');
+    }
+    
+    function createStrategyRow(strategy, rank, type) {
+        const row = document.createElement('tr');
+        
+        // Color coding based on P&L
+        let plClass = 'text-muted';
+        if (strategy.pnl_today > 0) {
+            plClass = 'text-success fw-bold';
+        } else if (strategy.pnl_today < 0) {
+            plClass = 'text-danger fw-bold';
+        }
+        
+        // Rank badge color
+        let rankBadgeClass = 'bg-secondary';
+        if (rank === 1) rankBadgeClass = 'bg-warning text-dark';
+        else if (rank === 2) rankBadgeClass = 'bg-success';
+        else if (rank === 3) rankBadgeClass = 'bg-info';
+        
+        row.innerHTML = `
+            <td><span class="badge ${rankBadgeClass} fs-6">#${rank}</span></td>
+            <td><strong>${strategy.sell_strike}</strong></td>
+            <td><strong>${strategy.buy_strike}</strong></td>
+            <td>₹${strategy.net_premium}</td>
+            <td class="text-success">₹${strategy.max_profit}</td>
+            <td class="${plClass}">₹${strategy.pnl_today}</td>
+        `;
+        
+        // Add hover effect
+        row.addEventListener('mouseenter', function() {
+            this.style.backgroundColor = type === 'CE' ? '#e8f5e8' : '#ffe8e8';
+        });
+        
+        row.addEventListener('mouseleave', function() {
+            this.style.backgroundColor = '';
+        });
+        
+        return row;
+    }
+    
+    function showNoDataMessage(message) {
+        document.getElementById('noDataSection').classList.remove('d-none');
+        if (message) {
+            document.querySelector('#noDataSection p').textContent = message;
+        }
+    }
+    
+    function formatNumber(num) {
+        return new Intl.NumberFormat('en-IN').format(num);
+    }
+});
+</script>
+{% endblock %}

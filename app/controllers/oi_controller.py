@@ -80,27 +80,41 @@ def oi_changes_api():
 def oi_history():
     """Display OI history analysis page"""
     try:
-        # Get available strikes for dropdown
-        available_strikes = db.session.query(
-            distinct(OptionChainData.strike_price)
-        ).filter(
-            OptionChainData.underlying == "NIFTY"
-        ).order_by(OptionChainData.strike_price).all()
-        
-        strikes = [float(strike[0]) for strike in available_strikes]
-        
         return render_template('oi_history.html', 
-                             available_strikes=strikes,
                              current_time=datetime.utcnow())
     except Exception as e:
         print(f"Error in oi_history: {e}")
         return render_template('oi_history.html', 
-                             available_strikes=[],
                              error="Error loading OI history page")
 
 
-def get_oi_history_data(strike_price, option_type):
-    """API endpoint for OI history data for specific strike and option type"""
+def get_strikes_api(underlying):
+    """API endpoint for getting available strikes for underlying"""
+    try:
+        from sqlalchemy import distinct
+        available_strikes = db.session.query(
+            distinct(OptionChainData.strike_price)
+        ).filter(
+            OptionChainData.underlying == underlying.upper()
+        ).order_by(OptionChainData.strike_price).all()
+        
+        strikes = [float(strike[0]) for strike in available_strikes]
+        
+        return jsonify({
+            'success': True,
+            'strikes': strikes
+        })
+        
+    except Exception as e:
+        print(f"Error in get_strikes_api: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'Error loading strikes: {str(e)}'
+        }), 500
+
+
+def get_oi_history_data(underlying, strike_price, option_type):
+    """API endpoint for OI history data for specific underlying, strike and option type"""
     try:
         from datetime import datetime, timedelta
         from sqlalchemy import and_
@@ -113,7 +127,7 @@ def get_oi_history_data(strike_price, option_type):
         # Get all records for this strike from today
         records = db.session.query(OptionChainData).filter(
             and_(
-                OptionChainData.underlying == "NIFTY",
+                OptionChainData.underlying == underlying.upper(),
                 OptionChainData.strike_price == strike,
                 OptionChainData.timestamp >= today_start
             )
@@ -166,13 +180,56 @@ def get_oi_history_data(strike_price, option_type):
                 change_from_start = current_oi - first_oi
                 change_percent_from_start = (change_from_start / first_oi * 100) if first_oi > 0 else 0
                 
+                # Calculate divergence (OI vs Price movement)
+                divergence = 'neutral'
+                divergence_symbol = '—'
+                
+                if i > 0:  # Need previous record to calculate price change
+                    prev_record = records[i-1]
+                    if option_type.upper() == 'CE':
+                        prev_ltp = prev_record.ce_ltp
+                    else:
+                        prev_ltp = prev_record.pe_ltp
+                    
+                    price_change = current_ltp - prev_ltp
+                    
+                    # Divergence logic:
+                    # Bullish Divergence: OI decreasing while price increasing
+                    # Bearish Divergence: OI increasing while price decreasing
+                    # Confluence: OI and price moving in same direction
+                    
+                    # Only calculate divergence for significant changes (avoid noise)
+                    if abs(oi_change) > 100 and abs(price_change) > 0.01:  # Minimum thresholds
+                        if oi_change > 0 and price_change < 0:
+                            divergence = 'bearish'
+                            divergence_symbol = '🔻'  # Bearish divergence
+                        elif oi_change < 0 and price_change > 0:
+                            divergence = 'bullish' 
+                            divergence_symbol = '▲'  # Bullish divergence
+                        elif (oi_change > 0 and price_change > 0) or (oi_change < 0 and price_change < 0):
+                            divergence = 'confluence'
+                            divergence_symbol = '⚡'  # Confluence (same direction)
+                        else:
+                            divergence_symbol = '—'
+                    elif abs(oi_change) > 1000:  # Significant OI change without price change
+                        divergence = 'volume_spike'
+                        divergence_symbol = '📊'  # Volume spike
+                    else:
+                        divergence_symbol = '—'
+                
+                # Get index price for this timestamp
+                index_price = get_index_price_for_timestamp(underlying.upper(), record.timestamp)
+                
                 history_data.append({
                     'timestamp': utc_to_ist(record.timestamp).strftime('%H:%M:%S'),
                     'oi': current_oi,
                     'oi_change': oi_change,
                     'oi_change_from_start': change_from_start,
                     'oi_change_percent_from_start': round(change_percent_from_start, 2),
-                    'ltp': current_ltp
+                    'ltp': current_ltp,
+                    'index_price': index_price,
+                    'divergence': divergence,
+                    'divergence_symbol': divergence_symbol
                 })
         
         response_data = {
@@ -202,3 +259,39 @@ def get_oi_history_data(strike_price, option_type):
             'success': False,
             'message': f'Error loading OI history: {str(e)}'
         }), 500
+
+
+def get_index_price_for_timestamp(underlying, timestamp):
+    """Get index price for specific underlying at given timestamp"""
+    try:
+        from app.models.nifty_price import NiftyPrice
+        from app.models.banknifty_price import BankNiftyPrice
+        from datetime import timedelta
+        from sqlalchemy import and_
+        
+        # Create a time window around the timestamp (±2 minutes)
+        start_time = timestamp - timedelta(minutes=2)
+        end_time = timestamp + timedelta(minutes=2)
+        
+        if underlying == "NIFTY":
+            price_record = db.session.query(NiftyPrice).filter(
+                and_(
+                    NiftyPrice.timestamp >= start_time,
+                    NiftyPrice.timestamp <= end_time
+                )
+            ).order_by(NiftyPrice.timestamp.desc()).first()
+        elif underlying == "BANKNIFTY":
+            price_record = db.session.query(BankNiftyPrice).filter(
+                and_(
+                    BankNiftyPrice.timestamp >= start_time,
+                    BankNiftyPrice.timestamp <= end_time
+                )
+            ).order_by(BankNiftyPrice.timestamp.desc()).first()
+        else:
+            return None
+            
+        return price_record.price if price_record else None
+        
+    except Exception as e:
+        print(f"Error getting index price for {underlying} at {timestamp}: {e}")
+        return None

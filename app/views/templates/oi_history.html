@@ -24,16 +24,21 @@
                 </div>
                 <div class="card-body">
                     <div class="row">
-                        <div class="col-md-4">
-                            <label for="strikeSelect" class="form-label">Strike Price</label>
-                            <select class="form-select" id="strikeSelect">
-                                <option value="">Select Strike Price</option>
-                                {% for strike in available_strikes %}
-                                <option value="{{ strike }}">{{ strike }}</option>
-                                {% endfor %}
+                        <div class="col-md-3">
+                            <label for="underlyingSelect" class="form-label">Underlying</label>
+                            <select class="form-select" id="underlyingSelect">
+                                <option value="">Select Underlying</option>
+                                <option value="NIFTY">NIFTY</option>
+                                <option value="BANKNIFTY">BANKNIFTY</option>
                             </select>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
+                            <label for="strikeSelect" class="form-label">Strike Price</label>
+                            <select class="form-select" id="strikeSelect" disabled>
+                                <option value="">Select Strike Price</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
                             <label for="optionTypeSelect" class="form-label">Option Type</label>
                             <select class="form-select" id="optionTypeSelect">
                                 <option value="">Select Option Type</option>
@@ -41,10 +46,78 @@
                                 <option value="PE">Put (PE)</option>
                             </select>
                         </div>
-                        <div class="col-md-4 d-flex align-items-end">
+                        <div class="col-md-3 d-flex align-items-end">
                             <button class="btn btn-success w-100" id="loadHistoryBtn" disabled>
                                 <i class="fas fa-search"></i> Load History
                             </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart Visualization Section -->
+    <div id="chartSection" class="row mb-4 d-none">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0"><i class="fas fa-chart-line"></i> Live Chart Analysis</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="oiChart" width="400" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0"><i class="fas fa-info-circle"></i> Chart Legend & Controls</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <h6>Chart Lines:</h6>
+                            <div class="d-flex flex-wrap gap-3">
+                                <div class="d-flex align-items-center">
+                                    <div style="width: 20px; height: 3px; background-color: black; margin-right: 8px;"></div>
+                                    <small><strong><span id="chartIndexLabel">Index Price</span></strong></small>
+                                </div>
+                                <div class="d-flex align-items-center">
+                                    <div style="width: 20px; height: 3px; background-color: blue; margin-right: 8px;"></div>
+                                    <small><strong>Strike LTP</strong></small>
+                                </div>
+                                <div class="d-flex align-items-center">
+                                    <div style="width: 20px; height: 3px; background-color: green; margin-right: 8px;"></div>
+                                    <small><strong>Open Interest</strong></small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-12">
+                            <h6>Current Values:</h6>
+                            <div class="row text-center">
+                                <div class="col-4">
+                                    <div class="border rounded p-2">
+                                        <small class="text-muted"><span id="currentIndexLabel">Index</span></small>
+                                        <div class="fw-bold" id="currentIndexValue">-</div>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="border rounded p-2">
+                                        <small class="text-muted">Strike LTP</small>
+                                        <div class="fw-bold text-primary" id="currentLtpValue">-</div>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="border rounded p-2">
+                                        <small class="text-muted">Open Interest</small>
+                                        <div class="fw-bold text-success" id="currentOiValue">-</div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -107,12 +180,72 @@
         </div>
     </div>
 
+    <!-- Latest Entry Display -->
+    <div id="latestEntrySection" class="row mb-3 d-none">
+        <div class="col-md-12">
+            <div class="card border-warning">
+                <div class="card-header bg-warning text-dark">
+                    <h6 class="mb-0"><i class="fas fa-clock"></i> Latest Entry 
+                        <small class="float-end">Auto-refreshing every 30 seconds</small>
+                    </h6>
+                </div>
+                <div class="card-body p-2">
+                    <div class="row text-center">
+                        <div class="col-md-1">
+                            <strong>Time</strong><br>
+                            <span id="latestTime" class="text-primary">-</span>
+                        </div>
+                        <div class="col-md-1">
+                            <strong>Current OI</strong><br>
+                            <span id="latestOi" class="fs-6">-</span>
+                        </div>
+                        <div class="col-md-2">
+                            <strong>Interval Change</strong><br>
+                            <span id="latestChange" class="fs-6">-</span>
+                        </div>
+                        <div class="col-md-2">
+                            <strong>Total Change</strong><br>
+                            <span id="latestTotalChange" class="fs-6">-</span>
+                        </div>
+                        <div class="col-md-1">
+                            <strong>Change %</strong><br>
+                            <span id="latestChangePercent" class="fs-6">-</span>
+                        </div>
+                        <div class="col-md-1">
+                            <strong>LTP</strong><br>
+                            <span id="latestLtp" class="fs-6">-</span>
+                        </div>
+                        <div class="col-md-2">
+                            <strong><i class="fas fa-chart-line"></i> Index Price</strong><br>
+                            <span id="latestIndexPrice" class="fs-6">-</span>
+                        </div>
+                        <div class="col-md-2">
+                            <strong><i class="fas fa-code-branch"></i> Divergence</strong><br>
+                            <span id="latestDivergence" class="fs-6">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- History Table -->
     <div id="historySection" class="row d-none">
         <div class="col-md-12">
             <div class="card">
                 <div class="card-header bg-info text-white">
-                    <h5 class="mb-0"><i class="fas fa-table"></i> OI Change Timeline (Only Changes Shown)</h5>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-table"></i> OI Change Timeline (Only Changes Shown)</h5>
+                        <div class="d-flex align-items-center">
+                            <small class="me-3">
+                                <i class="fas fa-sync-alt" id="refreshIcon"></i> 
+                                <span id="refreshStatus">Auto-refresh: ON</span>
+                            </small>
+                            <button class="btn btn-sm btn-outline-light" id="toggleAutoRefresh">
+                                <i class="fas fa-pause"></i> Pause
+                            </button>
+                        </div>
+                    </div>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -125,6 +258,8 @@
                                     <th>Total Change from Start</th>
                                     <th>Change % from Start</th>
                                     <th>LTP</th>
+                                    <th><i class="fas fa-chart-line"></i> Index Price</th>
+                                    <th><i class="fas fa-code-branch"></i> Divergence</th>
                                 </tr>
                             </thead>
                             <tbody id="historyTableBody">
@@ -147,64 +282,223 @@
             </div>
         </div>
     </div>
+
+    <!-- Divergence Legend (Moved to Bottom) -->
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="alert alert-info">
+                <h6 class="mb-2"><i class="fas fa-info-circle"></i> Divergence Legend:</h6>
+                <div class="row text-center">
+                    <div class="col-md-2">
+                        <span class="text-success fw-bold fs-5">▲</span>
+                        <small class="d-block text-success fw-bold">Bullish Divergence</small>
+                        <small class="text-success">OI ↓ Price ↑</small>
+                    </div>
+                    <div class="col-md-2">
+                        <span class="text-danger fw-bold fs-5">🔻</span>
+                        <small class="d-block">Bearish Divergence</small>
+                        <small class="text-muted">OI ↑ Price ↓</small>
+                    </div>
+                    <div class="col-md-3">
+                        <span class="text-warning fw-bold fs-5">⚡</span>
+                        <small class="d-block">Confluence</small>
+                        <small class="text-muted">OI & Price same direction</small>
+                    </div>
+                    <div class="col-md-2">
+                        <span class="text-primary fw-bold fs-5">📊</span>
+                        <small class="d-block">Volume Spike</small>
+                        <small class="text-muted">High OI activity</small>
+                    </div>
+                    <div class="col-md-3">
+                        <span class="text-muted fs-5">—</span>
+                        <small class="d-block">Neutral</small>
+                        <small class="text-muted">No significant change</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+
+<!-- Chart.js Library -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const underlyingSelect = document.getElementById('underlyingSelect');
     const strikeSelect = document.getElementById('strikeSelect');
     const optionTypeSelect = document.getElementById('optionTypeSelect');
     const loadHistoryBtn = document.getElementById('loadHistoryBtn');
     
+    // Auto-refresh variables
+    let autoRefreshInterval = null;
+    let isAutoRefreshActive = false;
+    let currentUnderlying = null;
+    let currentStrike = null;
+    let currentOptionType = null;
+    
+    // Chart variables
+    let oiChart = null;
+    let chartData = {
+        labels: [],
+        indexPrices: [],
+        ltpPrices: [],
+        oiValues: []
+    };
+    
     // Enable/disable load button based on selections
     function updateLoadButton() {
+        const underlyingSelected = underlyingSelect.value !== '';
         const strikeSelected = strikeSelect.value !== '';
         const typeSelected = optionTypeSelect.value !== '';
-        loadHistoryBtn.disabled = !(strikeSelected && typeSelected);
+        loadHistoryBtn.disabled = !(underlyingSelected && strikeSelected && typeSelected);
     }
+    
+    // Load strikes when underlying is selected
+    underlyingSelect.addEventListener('change', function() {
+        const underlying = this.value;
+        if (underlying) {
+            loadStrikes(underlying);
+            strikeSelect.disabled = false;
+        } else {
+            strikeSelect.innerHTML = '<option value="">Select Strike Price</option>';
+            strikeSelect.disabled = true;
+        }
+        updateLoadButton();
+    });
     
     strikeSelect.addEventListener('change', updateLoadButton);
     optionTypeSelect.addEventListener('change', updateLoadButton);
     
-    // Load history data
-    loadHistoryBtn.addEventListener('click', function() {
-        const strike = strikeSelect.value;
-        const optionType = optionTypeSelect.value;
-        
-        if (!strike || !optionType) return;
-        
-        loadOiHistory(strike, optionType);
-    });
-    
-    function loadOiHistory(strike, optionType) {
-        // Show loading spinner
-        document.getElementById('loadingSpinner').classList.remove('d-none');
-        document.getElementById('summarySection').classList.add('d-none');
-        document.getElementById('historySection').classList.add('d-none');
-        document.getElementById('noDataSection').classList.add('d-none');
-        
-        fetch(`/api/oi-history/${strike}/${optionType}`)
+    // Load available strikes for selected underlying
+    function loadStrikes(underlying) {
+        fetch(`/api/strikes/${underlying}`)
             .then(response => response.json())
             .then(data => {
-                document.getElementById('loadingSpinner').classList.add('d-none');
-                
-                if (data.success) {
-                    displayHistoryData(data);
-                } else {
-                    showNoDataMessage(data.message || 'Failed to load data');
+                strikeSelect.innerHTML = '<option value="">Select Strike Price</option>';
+                if (data.success && data.strikes) {
+                    data.strikes.forEach(strike => {
+                        const option = document.createElement('option');
+                        option.value = strike;
+                        option.textContent = strike;
+                        strikeSelect.appendChild(option);
+                    });
                 }
             })
             .catch(error => {
-                document.getElementById('loadingSpinner').classList.add('d-none');
-                showNoDataMessage('Error loading data: ' + error.message);
-                console.error('Error:', error);
+                console.error('Error loading strikes:', error);
+                strikeSelect.innerHTML = '<option value="">Error loading strikes</option>';
             });
     }
     
-    function displayHistoryData(data) {
+    // Load history data
+    loadHistoryBtn.addEventListener('click', function() {
+        const underlying = underlyingSelect.value;
+        const strike = strikeSelect.value;
+        const optionType = optionTypeSelect.value;
+        
+        if (!underlying || !strike || !optionType) return;
+        
+        // Store current selection for auto-refresh
+        currentUnderlying = underlying;
+        currentStrike = strike;
+        currentOptionType = optionType;
+        
+        loadOiHistory(underlying, strike, optionType);
+        startAutoRefresh();
+    });
+    
+    // Auto-refresh toggle
+    document.getElementById('toggleAutoRefresh').addEventListener('click', function() {
+        if (isAutoRefreshActive) {
+            stopAutoRefresh();
+        } else {
+            startAutoRefresh();
+        }
+    });
+    
+    // Auto-refresh functions
+    function startAutoRefresh() {
+        if (currentUnderlying && currentStrike && currentOptionType) {
+            isAutoRefreshActive = true;
+            document.getElementById('refreshStatus').textContent = 'Auto-refresh: ON';
+            document.getElementById('toggleAutoRefresh').innerHTML = '<i class="fas fa-pause"></i> Pause';
+            
+            // Refresh every 30 seconds
+            autoRefreshInterval = setInterval(() => {
+                loadOiHistory(currentUnderlying, currentStrike, currentOptionType, true);
+                // Animate refresh icon
+                const icon = document.getElementById('refreshIcon');
+                icon.classList.add('fa-spin');
+                setTimeout(() => icon.classList.remove('fa-spin'), 1000);
+            }, 30000);
+        }
+    }
+    
+    function stopAutoRefresh() {
+        if (autoRefreshInterval) {
+            clearInterval(autoRefreshInterval);
+            autoRefreshInterval = null;
+        }
+        isAutoRefreshActive = false;
+        document.getElementById('refreshStatus').textContent = 'Auto-refresh: OFF';
+        document.getElementById('toggleAutoRefresh').innerHTML = '<i class="fas fa-play"></i> Resume';
+    }
+    
+    function loadOiHistory(underlying, strike, optionType, isRefresh = false) {
+        // Only show loading spinner for initial load, not for auto-refresh
+        if (!isRefresh) {
+            document.getElementById('loadingSpinner').classList.remove('d-none');
+            document.getElementById('summarySection').classList.add('d-none');
+            document.getElementById('historySection').classList.add('d-none');
+            document.getElementById('latestEntrySection').classList.add('d-none');
+            document.getElementById('chartSection').classList.add('d-none');
+            document.getElementById('noDataSection').classList.add('d-none');
+        }
+        
+        fetch(`/api/oi-history/${underlying}/${strike}/${optionType}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (!isRefresh) {
+                    document.getElementById('loadingSpinner').classList.add('d-none');
+                }
+                
+                console.log('API Response:', data); // Debug log
+                
+                if (data.success) {
+                    displayHistoryData(data, isRefresh);
+                } else {
+                    if (!isRefresh) {
+                        showNoDataMessage(data.message || 'Failed to load data');
+                    }
+                }
+            })
+            .catch(error => {
+                if (!isRefresh) {
+                    document.getElementById('loadingSpinner').classList.add('d-none');
+                    showNoDataMessage('Error loading data: ' + error.message);
+                }
+                console.error('Fetch Error:', error);
+            });
+    }
+    
+    function displayHistoryData(data, isRefresh = false) {
+        console.log('Received data:', data); // Debug log
         const summary = data.summary;
         const history = data.history;
         
-        // Update summary
+        // Check if we have valid data
+        if (!history || history.length === 0) {
+            showNoDataMessage('No history records found');
+            return;
+        }
+        
+        // Update summary (always update)
         document.getElementById('summaryStrike').textContent = data.strike_price;
         document.getElementById('summaryType').textContent = data.option_type;
         document.getElementById('totalOiChange').textContent = formatNumber(summary.total_oi_change);
@@ -226,40 +520,124 @@ document.addEventListener('DOMContentLoaded', function() {
         totalPriceChangeElement.className = summary.total_price_change > 0 ? 'fs-5 fw-bold text-success' : 
                                            summary.total_price_change < 0 ? 'fs-5 fw-bold text-danger' : 'fs-5 fw-bold';
         
-        // Populate history table
+        // Update latest entry display
+        if (history.length > 0) {
+            const latest = history[history.length - 1];
+            document.getElementById('latestTime').textContent = latest.timestamp;
+            document.getElementById('latestOi').textContent = formatNumber(latest.oi);
+            
+            const latestChangeEl = document.getElementById('latestChange');
+            latestChangeEl.textContent = (latest.oi_change > 0 ? '+' : '') + formatNumber(latest.oi_change);
+            latestChangeEl.className = latest.oi_change > 0 ? 'fs-6 text-success' : 
+                                      latest.oi_change < 0 ? 'fs-6 text-danger' : 'fs-6';
+            
+            const latestTotalChangeEl = document.getElementById('latestTotalChange');
+            latestTotalChangeEl.textContent = (latest.oi_change_from_start > 0 ? '+' : '') + formatNumber(latest.oi_change_from_start);
+            latestTotalChangeEl.className = latest.oi_change_from_start > 0 ? 'fs-6 text-success' : 
+                                           latest.oi_change_from_start < 0 ? 'fs-6 text-danger' : 'fs-6';
+            
+            const latestChangePercentEl = document.getElementById('latestChangePercent');
+            latestChangePercentEl.textContent = (latest.oi_change_percent_from_start > 0 ? '+' : '') + latest.oi_change_percent_from_start + '%';
+            latestChangePercentEl.className = latest.oi_change_percent_from_start > 0 ? 'fs-6 text-success' : 
+                                             latest.oi_change_percent_from_start < 0 ? 'fs-6 text-danger' : 'fs-6';
+            
+            document.getElementById('latestLtp').textContent = '₹' + latest.ltp;
+            
+            // Update index price
+            document.getElementById('latestIndexPrice').textContent = latest.index_price ? '₹' + formatNumber(latest.index_price) : '-';
+            
+            // Update divergence
+            const latestDivergenceEl = document.getElementById('latestDivergence');
+            latestDivergenceEl.textContent = latest.divergence_symbol;
+            latestDivergenceEl.title = getDivergenceTooltip(latest.divergence);
+            latestDivergenceEl.className = latest.divergence === 'bullish' ? 'fs-6 text-success fw-bold' : 
+                                          latest.divergence === 'bearish' ? 'fs-6 text-danger fw-bold' : 
+                                          latest.divergence === 'confluence' ? 'fs-6 text-warning fw-bold' : 
+                                          latest.divergence === 'volume_spike' ? 'fs-6 text-primary fw-bold' : 'fs-6 text-muted';
+        }
+        
+        // Populate or update history table
         const tbody = document.getElementById('historyTableBody');
-        tbody.innerHTML = '';
+        const existingRows = tbody.children.length;
         
-        history.forEach(record => {
-            const row = document.createElement('tr');
-            
-            const changeClass = record.oi_change > 0 ? 'text-success' : 
-                               record.oi_change < 0 ? 'text-danger' : '';
-            
-            const totalChangeClass = record.oi_change_from_start > 0 ? 'text-success' : 
-                                    record.oi_change_from_start < 0 ? 'text-danger' : '';
-            
-            row.innerHTML = `
-                <td>${record.timestamp}</td>
-                <td>${formatNumber(record.oi)}</td>
-                <td class="${changeClass}">
-                    ${record.oi_change > 0 ? '+' : ''}${formatNumber(record.oi_change)}
-                </td>
-                <td class="${totalChangeClass}">
-                    ${record.oi_change_from_start > 0 ? '+' : ''}${formatNumber(record.oi_change_from_start)}
-                </td>
-                <td class="${totalChangeClass}">
-                    ${record.oi_change_percent_from_start > 0 ? '+' : ''}${record.oi_change_percent_from_start}%
-                </td>
-                <td>₹${record.ltp}</td>
-            `;
-            
-            tbody.appendChild(row);
-        });
+        if (isRefresh && existingRows > 0) {
+            // For refresh, only add new rows if there are more entries
+            if (history.length > existingRows) {
+                // Add new rows (highlight them briefly)
+                for (let i = existingRows; i < history.length; i++) {
+                    const record = history[i];
+                    const row = createTableRow(record);
+                    row.style.backgroundColor = '#fff3cd'; // Highlight new row
+                    tbody.appendChild(row);
+                    
+                    // Remove highlight after 3 seconds
+                    setTimeout(() => {
+                        row.style.backgroundColor = '';
+                    }, 3000);
+                }
+            }
+        } else {
+            // For initial load, populate entire table
+            tbody.innerHTML = '';
+            history.forEach(record => {
+                tbody.appendChild(createTableRow(record));
+            });
+        }
         
-        // Show sections
-        document.getElementById('summarySection').classList.remove('d-none');
-        document.getElementById('historySection').classList.remove('d-none');
+        // Show sections (only for initial load)
+        if (!isRefresh) {
+            document.getElementById('summarySection').classList.remove('d-none');
+            document.getElementById('historySection').classList.remove('d-none');
+            document.getElementById('latestEntrySection').classList.remove('d-none');
+            document.getElementById('chartSection').classList.remove('d-none');
+        }
+        
+        // Update chart data
+        updateChartData(history);
+        
+        // Initialize or update chart
+        if (!isRefresh) {
+            initializeChart();
+        } else {
+            updateChart();
+        }
+    }
+    
+    function createTableRow(record) {
+        const row = document.createElement('tr');
+        
+        const changeClass = record.oi_change > 0 ? 'text-success' : 
+                           record.oi_change < 0 ? 'text-danger' : '';
+        
+        const totalChangeClass = record.oi_change_from_start > 0 ? 'text-success' : 
+                                record.oi_change_from_start < 0 ? 'text-danger' : '';
+        
+        // Divergence styling
+        const divergenceClass = record.divergence === 'bullish' ? 'text-success fw-bold' : 
+                               record.divergence === 'bearish' ? 'text-danger fw-bold' : 
+                               record.divergence === 'confluence' ? 'text-warning fw-bold' : 
+                               record.divergence === 'volume_spike' ? 'text-primary fw-bold' : 'text-muted';
+        
+        row.innerHTML = `
+            <td>${record.timestamp}</td>
+            <td>${formatNumber(record.oi)}</td>
+            <td class="${changeClass}">
+                ${record.oi_change > 0 ? '+' : ''}${formatNumber(record.oi_change)}
+            </td>
+            <td class="${totalChangeClass}">
+                ${record.oi_change_from_start > 0 ? '+' : ''}${formatNumber(record.oi_change_from_start)}
+            </td>
+            <td class="${totalChangeClass}">
+                ${record.oi_change_percent_from_start > 0 ? '+' : ''}${record.oi_change_percent_from_start}%
+            </td>
+            <td>₹${record.ltp}</td>
+            <td>${record.index_price ? '₹' + formatNumber(record.index_price) : '-'}</td>
+            <td class="${divergenceClass}" title="${getDivergenceTooltip(record.divergence)}">
+                ${record.divergence_symbol}
+            </td>
+        `;
+        
+        return row;
     }
     
     function showNoDataMessage(message) {
@@ -271,6 +649,249 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function formatNumber(num) {
         return new Intl.NumberFormat('en-IN').format(num);
+    }
+    
+    function getDivergenceTooltip(divergence) {
+        switch(divergence) {
+            case 'bullish':
+                return 'Bullish Divergence: OI decreasing while price increasing - Potential upward move';
+            case 'bearish':
+                return 'Bearish Divergence: OI increasing while price decreasing - Potential downward move';
+            case 'confluence':
+                return 'Confluence: OI and price moving in same direction - Trend confirmation';
+            case 'volume_spike':
+                return 'Volume Spike: Significant OI change without proportional price movement';
+            default:
+                return 'No significant divergence detected';
+        }
+    }
+    
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', function() {
+        stopAutoRefresh();
+    });
+    
+    // Stop auto-refresh when user changes selections and hide chart
+    underlyingSelect.addEventListener('change', function() {
+        stopAutoRefresh();
+        document.getElementById('chartSection').classList.add('d-none');
+    });
+    strikeSelect.addEventListener('change', function() {
+        stopAutoRefresh();
+        document.getElementById('chartSection').classList.add('d-none');
+    });
+    optionTypeSelect.addEventListener('change', function() {
+        stopAutoRefresh();
+        document.getElementById('chartSection').classList.add('d-none');
+    });
+    
+    // Chart Functions
+    function updateChartData(history) {
+        chartData.labels = [];
+        chartData.indexPrices = [];
+        chartData.ltpPrices = [];
+        chartData.oiValues = [];
+        
+        history.forEach(record => {
+            // Safely format time for chart
+            let timeLabel = 'N/A';
+            if (record.timestamp) {
+                try {
+                    // Check if timestamp contains space (date and time) or just time
+                    if (record.timestamp.includes(' ')) {
+                        const parts = record.timestamp.split(' ');
+                        timeLabel = parts[1].substring(0, 5); // Get HH:MM from time part
+                    } else {
+                        // Just time, format to HH:MM
+                        timeLabel = record.timestamp.substring(0, 5);
+                    }
+                } catch (e) {
+                    console.warn('Error parsing timestamp:', record.timestamp, e);
+                    timeLabel = record.timestamp || 'N/A';
+                }
+            }
+            
+            chartData.labels.push(timeLabel);
+            chartData.indexPrices.push(record.index_price || 0);
+            chartData.ltpPrices.push(record.ltp || 0);
+            chartData.oiValues.push(record.oi || 0);
+        });
+        
+        // Update labels and current values display
+        document.getElementById('chartIndexLabel').textContent = `${currentUnderlying} Index Price`;
+        document.getElementById('currentIndexLabel').textContent = `${currentUnderlying} Index`;
+        
+        if (history.length > 0) {
+            const latest = history[history.length - 1];
+            document.getElementById('currentIndexValue').textContent = latest.index_price ? '₹' + formatNumber(latest.index_price) : '-';
+            document.getElementById('currentLtpValue').textContent = '₹' + latest.ltp;
+            document.getElementById('currentOiValue').textContent = formatNumber(latest.oi);
+        }
+    }
+    
+    function initializeChart() {
+        const ctx = document.getElementById('oiChart').getContext('2d');
+        
+        // Destroy existing chart if it exists
+        if (oiChart) {
+            oiChart.destroy();
+        }
+        
+        oiChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: chartData.labels,
+                datasets: [
+                    {
+                        label: `${currentUnderlying} Index Price`,
+                        data: chartData.indexPrices,
+                        borderColor: 'black',
+                        backgroundColor: 'rgba(0, 0, 0, 0.1)',
+                        borderWidth: 2,
+                        yAxisID: 'y',
+                        pointRadius: 2,
+                        pointHoverRadius: 4,
+                        tension: 0.1
+                    },
+                    {
+                        label: 'Strike LTP',
+                        data: chartData.ltpPrices,
+                        borderColor: 'blue',
+                        backgroundColor: 'rgba(0, 0, 255, 0.1)',
+                        borderWidth: 2,
+                        yAxisID: 'y1',
+                        pointRadius: 2,
+                        pointHoverRadius: 4,
+                        tension: 0.1
+                    },
+                    {
+                        label: 'Open Interest',
+                        data: chartData.oiValues,
+                        borderColor: 'green',
+                        backgroundColor: 'rgba(0, 128, 0, 0.1)',
+                        borderWidth: 2,
+                        yAxisID: 'y2',
+                        pointRadius: 2,
+                        pointHoverRadius: 4,
+                        tension: 0.1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                plugins: {
+                    title: {
+                        display: true,
+                        text: `${currentUnderlying} ${currentStrike} ${currentOptionType} - Live Analysis`,
+                        font: {
+                            size: 14,
+                            weight: 'bold'
+                        }
+                    },
+                    legend: {
+                        display: true,
+                        position: 'bottom'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            title: function(context) {
+                                return `Time: ${context[0].label}`;
+                            },
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.datasetIndex === 2) {
+                                    // OI values don't need currency symbol
+                                    label += formatNumber(context.parsed.y);
+                                } else {
+                                    // Index and LTP need currency symbol
+                                    label += '₹' + formatNumber(context.parsed.y);
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Time (IST)',
+                            font: {
+                                weight: 'bold'
+                            }
+                        },
+                        ticks: {
+                            maxTicksLimit: 10 // Limit number of time labels
+                        }
+                    },
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: 'Index Price (₹)',
+                            color: 'black',
+                            font: {
+                                weight: 'bold'
+                            }
+                        },
+                        ticks: {
+                            color: 'black'
+                        }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: false, // Hide this axis as it would clutter
+                        position: 'right',
+                        grid: {
+                            drawOnChartArea: false,
+                        },
+                        title: {
+                            display: false,
+                            text: 'LTP (₹)',
+                            color: 'blue'
+                        }
+                    },
+                    y2: {
+                        type: 'linear',
+                        display: false, // Hide this axis as it would clutter
+                        position: 'right',
+                        grid: {
+                            drawOnChartArea: false,
+                        },
+                        title: {
+                            display: false,
+                            text: 'Open Interest',
+                            color: 'green'
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    function updateChart() {
+        if (oiChart) {
+            oiChart.data.labels = chartData.labels;
+            oiChart.data.datasets[0].data = chartData.indexPrices;
+            oiChart.data.datasets[1].data = chartData.ltpPrices;
+            oiChart.data.datasets[2].data = chartData.oiValues;
+            
+            // Update chart title
+            oiChart.options.plugins.title.text = `${currentUnderlying} ${currentStrike} ${currentOptionType} - Live Analysis`;
+            
+            oiChart.update('none'); // Update without animation for smoother refresh
+        }
     }
 });
 </script>

@@ -72,8 +72,20 @@ def get_oi_changes():
     """API endpoint to get OI changes data"""
     return oi_changes_api()
 
-@api_bp.route('/oi-history/<strike_price>/<option_type>', methods=['GET'])
-def get_oi_history(strike_price, option_type):
-    """API endpoint to get OI history for specific strike and option type"""
+@api_bp.route('/strikes/<underlying>', methods=['GET'])
+def get_strikes(underlying):
+    """API endpoint to get available strikes for underlying"""
+    from app.controllers.oi_controller import get_strikes_api
+    return get_strikes_api(underlying)
+
+@api_bp.route('/oi-history/<underlying>/<strike_price>/<option_type>', methods=['GET'])
+def get_oi_history(underlying, strike_price, option_type):
+    """API endpoint to get OI history for specific underlying, strike and option type"""
     from app.controllers.oi_controller import get_oi_history_data
-    return get_oi_history_data(strike_price, option_type)
+    return get_oi_history_data(underlying, strike_price, option_type)
+
+@api_bp.route('/strategy-analysis/<underlying>/<int:strike_gap>/<int:protection_gap>', methods=['GET'])
+def get_strategy_analysis(underlying, strike_gap, protection_gap):
+    """API endpoint to get strategy analysis for sell high + buy higher strategy"""
+    from app.controllers.strategy_controller import analyze_strategies
+    return analyze_strategies(underlying, strike_gap, protection_gap)
