@@ -17,6 +17,6 @@ def guest_only(f):
     def decorated_function(*args, **kwargs):
         kite_service = KiteService()
         if kite_service.is_authenticated():
-            return redirect(url_for('market.dashboard'))
+            return redirect(url_for('market.dashboard_new'))
         return f(*args, **kwargs)
     return decorated_function

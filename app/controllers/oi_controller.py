@@ -27,26 +27,54 @@ def oi_changes_timeline_api():
     """API endpoint for OI changes timeline data for chart"""
     try:
         from sqlalchemy import func
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, time
+        from flask import request
         
-        # Get today's start time
-        today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        # Get underlying parameter (default to NIFTY)
+        underlying = request.args.get('underlying', 'NIFTY').upper()
         
-        # Get all records from today grouped by timestamp
+        # Get today's market hours: 9:20 AM to 15:30 IST and convert to UTC
+        from datetime import timezone, timedelta
+        today = datetime.now().date()
+        
+        # Create IST timezone
+        ist_timezone = timezone(timedelta(hours=5, minutes=30))
+        
+        # Create 9:20 AM IST time
+        market_start_ist = datetime.combine(today, time(9, 20)).replace(tzinfo=ist_timezone)
+        
+        # Create 15:30 IST time (market close)
+        market_end_ist = datetime.combine(today, time(15, 30)).replace(tzinfo=ist_timezone)
+        
+        # Convert to UTC for database query
+        market_start_utc = market_start_ist.astimezone(timezone.utc).replace(tzinfo=None)
+        market_end_utc = market_end_ist.astimezone(timezone.utc).replace(tzinfo=None)
+        
+        # Get all records from 9:20 AM today grouped by minute for better readability
         timeline_data = db.session.query(
-            OptionChainData.timestamp,
+            func.date_trunc('minute', OptionChainData.timestamp).label('time_bucket'),
             func.sum(OptionChainData.ce_oi_change).label('total_ce_change'),
             func.sum(OptionChainData.pe_oi_change).label('total_pe_change')
         ).filter(
-            OptionChainData.timestamp >= today_start,
-            OptionChainData.underlying == 'NIFTY'
-        ).group_by(OptionChainData.timestamp).order_by(OptionChainData.timestamp).all()
+            OptionChainData.timestamp >= market_start_utc,
+            OptionChainData.timestamp <= market_end_utc,
+            OptionChainData.underlying == underlying
+        ).group_by(func.date_trunc('minute', OptionChainData.timestamp)).order_by(func.date_trunc('minute', OptionChainData.timestamp)).all()
+        
+        # Get corresponding index prices for the timeline
+        if underlying == 'NIFTY':
+            from app.models.nifty_price import NiftyPrice
+            price_model = NiftyPrice
+        else:
+            from app.models.banknifty_price import BankNiftyPrice
+            price_model = BankNiftyPrice
         
         # Format data for chart
         chart_data = {
             'labels': [],
             'ce_changes': [],
-            'pe_changes': []
+            'pe_changes': [],
+            'index_prices': []
         }
         
         cumulative_ce_change = 0
@@ -54,16 +82,24 @@ def oi_changes_timeline_api():
         
         for record in timeline_data:
             # Convert timestamp to IST and format for display
-            ist_time = utc_to_ist(record.timestamp)
+            ist_time = utc_to_ist(record.time_bucket)
             time_label = ist_time.strftime('%H:%M')
             
             # Calculate cumulative changes
             cumulative_ce_change += (record.total_ce_change or 0)
             cumulative_pe_change += (record.total_pe_change or 0)
             
+            # Get corresponding index price (within 5 minutes of the OI timestamp)
+            price_record = price_model.query.filter(
+                func.abs(func.extract('epoch', price_model.timestamp) - func.extract('epoch', record.time_bucket)) < 300
+            ).order_by(func.abs(func.extract('epoch', price_model.timestamp) - func.extract('epoch', record.time_bucket))).first()
+            
+            index_price = price_record.price if price_record else (26000 if underlying == 'NIFTY' else 59000)
+            
             chart_data['labels'].append(time_label)
             chart_data['ce_changes'].append(cumulative_ce_change)
             chart_data['pe_changes'].append(cumulative_pe_change)
+            chart_data['index_prices'].append(float(index_price))
         
         return jsonify({
             'success': True,

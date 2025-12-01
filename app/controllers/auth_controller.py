@@ -30,7 +30,7 @@ def kite_callback():
         access_token = kite_service.generate_session(request_token)
         
         flash('Successfully logged in with Kite!', 'success')
-        return redirect(url_for('market.dashboard'))
+        return redirect(url_for('market.dashboard_new'))
     except Exception as e:
         flash(f'Login error: {str(e)}', 'danger')
         return redirect(url_for('auth.login'))

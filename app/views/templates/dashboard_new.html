@@ -1,0 +1,1681 @@
+{% extends "base.html" %}
+
+{% block title %}Trading Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+.dashboard-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    transition: transform 0.3s ease;
+}
+
+.dashboard-card:hover {
+    transform: translateY(-5px);
+}
+
+.price-card {
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+}
+
+.gainers-card {
+    background: linear-gradient(135deg, #00b09b 0%, #96c93d 100%);
+}
+
+.losers-card {
+    background: linear-gradient(135deg, #fc4a1a 0%, #f7b733 100%);
+}
+
+.influence-card {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
+
+.chart-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 400px;
+}
+
+.stat-value {
+    font-size: 2.5rem;
+    font-weight: bold;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    opacity: 0.9;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.change-positive {
+    color: #00ff88;
+}
+
+.change-negative {
+    color: #ff4757;
+}
+
+.stock-item {
+    background: rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 10px;
+    margin-bottom: 8px;
+    backdrop-filter: blur(10px);
+}
+
+.chart-container {
+    position: relative;
+    height: 350px;
+    background: rgba(255,255,255,0.95);
+    border-radius: 10px;
+    padding: 15px;
+}
+
+.section-title {
+    color: white;
+    font-weight: bold;
+    margin-bottom: 20px;
+    text-align: center;
+    font-size: 1.2rem;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+}
+
+.pulse {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+}
+
+.market-status {
+    display: inline-block;
+    padding: 5px 15px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.market-open {
+    background: #00ff88;
+    color: #000;
+}
+
+.market-closed {
+    background: #ff4757;
+    color: #fff;
+}
+
+.meter-container {
+    position: relative;
+    width: 200px;
+    height: 120px;
+    margin: 0 auto;
+}
+
+.signal-text-overlay {
+    position: absolute;
+    top: 65%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+}
+
+.signal-value {
+    font-size: 1rem;
+    font-weight: bold;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+}
+
+.signal-score {
+    font-size: 0.8rem;
+    opacity: 0.8;
+}
+
+.signal-indicators .badge {
+    font-size: 0.7rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="display-6 mb-0">📊 Trading Dashboard</h1>
+                    <p class="text-muted mb-0">Real-time market overview and analytics</p>
+                </div>
+                <div>
+                    <span class="market-status market-closed" id="marketStatus">Market Closed</span>
+                    <button class="btn btn-sm btn-outline-success ms-2" onclick="manualRefresh()" title="Refresh Now">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                    <small class="text-success ms-2" id="refreshIndicator" style="display: none;">
+                        <i class="fas fa-sync-alt fa-spin me-1"></i>Refreshing...
+                    </small>
+                    <br><small class="text-muted" id="lastUpdate">Last updated: <span id="updateTime"></span></small>
+                    <br><small class="text-info" id="refreshCountdown">Next refresh in: 60s</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Row - Price Cards -->
+    <div class="row mb-4">
+        <!-- Market Signal Meter -->
+        <div class="col-lg-6 col-md-6 mb-3">
+            <div class="card dashboard-card price-card text-white h-100">
+                <div class="card-body text-center">
+                    <h3 class="card-title mb-3">
+                        <i class="fas fa-tachometer-alt me-2"></i>Market Signal
+                    </h3>
+                    <div class="meter-container position-relative mb-3">
+                        <canvas id="signalMeter" width="200" height="120"></canvas>
+                        <div class="signal-text-overlay">
+                            <div class="signal-value" id="signalText">NEUTRAL</div>
+                            <div class="signal-score small" id="signalScore">0</div>
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <small class="stat-label d-block">5-Factor Market Analysis</small>
+                        <div class="signal-indicators mt-2" style="font-size: 0.85rem;">
+                            <span class="badge bg-secondary me-1" id="niftyIndicator">NIFTY: 0%</span>
+                            <span class="badge bg-secondary me-1" id="bankniftyIndicator">BNF: 0%</span>
+                            <span class="badge bg-secondary me-1" id="niftyOiIndicator">N-OIC: 0%</span>
+                            <span class="badge bg-secondary me-1" id="bankniftyOiIndicator">BNF-OIC: 0%</span>
+                            <span class="badge bg-secondary" id="netInfluenceIndicator">NET: 0%</span>
+                        </div>
+                        <div class="mt-2">
+                            <button class="btn btn-sm btn-outline-light" onclick="toggleDebugPanel()" id="debugToggle">
+                                <i class="fas fa-cog me-1"></i>Debug
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Combined Index Prices Card -->
+        <div class="col-lg-6 col-md-6 mb-3">
+            <div class="card dashboard-card price-card text-white h-100">
+                <div class="card-body">
+                    <h3 class="card-title mb-3 text-center">
+                        <i class="fas fa-chart-line me-2"></i>Market Indices
+                    </h3>
+                    
+                    <!-- NIFTY 50 -->
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h5 class="mb-1">NIFTY 50</h5>
+                                    <div class="stat-value fs-4" id="niftyPrice">
+                                        {% if nifty_price %}₹{{ "%.2f"|format(nifty_price.price) }}{% else %}Loading...{% endif %}
+                                    </div>
+                                </div>
+                                <div class="text-end">
+                                    <span id="niftyChange" class="fs-5">
+                                        {% if nifty_price %}
+                                            {% if nifty_price.change_percent > 0 %}
+                                                <i class="fas fa-arrow-up me-1"></i><span class="change-positive">+{{ "%.2f"|format(nifty_price.change_percent) }}%</span>
+                                            {% else %}
+                                                <i class="fas fa-arrow-down me-1"></i><span class="change-negative">{{ "%.2f"|format(nifty_price.change_percent) }}%</span>
+                                            {% endif %}
+                                        {% else %}
+                                            <i class="fas fa-minus me-1"></i>0.00%
+                                        {% endif %}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="my-2 opacity-25">
+
+                    <!-- BANKNIFTY -->
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h5 class="mb-1">BANKNIFTY</h5>
+                                    <div class="stat-value fs-4" id="bankniftyPrice">
+                                        {% if banknifty_price %}₹{{ "%.2f"|format(banknifty_price.price) }}{% else %}Loading...{% endif %}
+                                    </div>
+                                </div>
+                                <div class="text-end">
+                                    <span id="bankniftyChange" class="fs-5">
+                                        {% if banknifty_price %}
+                                            {% if banknifty_price.change_percent > 0 %}
+                                                <i class="fas fa-arrow-up me-1"></i><span class="change-positive">+{{ "%.2f"|format(banknifty_price.change_percent) }}%</span>
+                                            {% else %}
+                                                <i class="fas fa-arrow-down me-1"></i><span class="change-negative">{{ "%.2f"|format(banknifty_price.change_percent) }}%</span>
+                                            {% endif %}
+                                        {% else %}
+                                            <i class="fas fa-minus me-1"></i>0.00%
+                                        {% endif %}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <small class="stat-label text-center d-block mt-2">Real-time Index Prices</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Second Row - Gainers, Losers, and Influence -->
+    <div class="row mb-4">
+        <!-- Top 3 Gainers -->
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card dashboard-card gainers-card text-white h-100">
+                <div class="card-body">
+                    <h5 class="section-title">
+                        <i class="fas fa-arrow-up me-2"></i>Top 3 Gainers
+                    </h5>
+                    <div class="row" id="gainersContainer">
+                        {% if top_gainers %}
+                            {% for stock in top_gainers[:3] %}
+                            <div class="col-12 mb-2">
+                                <div class="card gainer-card h-100">
+                                    <div class="card-body p-2">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <h6 class="card-title mb-1">{{ stock.symbol }}</h6>
+                                                <small class="text-muted">{{ stock.company_name[:25] }}{% if stock.company_name|length > 25 %}...{% endif %}</small>
+                                            </div>
+                                            <div class="text-end">
+                                                <div class="fs-6 fw-bold">₹{{ "%.2f"|format(stock.current_price) }}</div>
+                                                <div class="change-positive">
+                                                    <i class="fas fa-arrow-up me-1"></i>+{{ "%.2f"|format(stock.change_percent) }}%
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="text-center">
+                                <i class="fas fa-spinner fa-spin fa-2x mb-2"></i>
+                                <p>Loading gainers...</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top 3 Losers -->
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card dashboard-card losers-card text-white h-100">
+                <div class="card-body">
+                    <h5 class="section-title">
+                        <i class="fas fa-arrow-down me-2"></i>Top 3 Losers
+                    </h5>
+                    <div class="row" id="losersContainer">
+                        {% if top_losers %}
+                            {% for stock in top_losers[:3] %}
+                            <div class="col-12 mb-2">
+                                <div class="card loser-card h-100">
+                                    <div class="card-body p-2">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <h6 class="card-title mb-1">{{ stock.symbol }}</h6>
+                                                <small class="text-muted">{{ stock.company_name[:25] }}{% if stock.company_name|length > 25 %}...{% endif %}</small>
+                                            </div>
+                                            <div class="text-end">
+                                                <div class="fs-6 fw-bold">₹{{ "%.2f"|format(stock.current_price) }}</div>
+                                                <div class="change-negative">
+                                                    <i class="fas fa-arrow-down me-1"></i>{{ "%.2f"|format(stock.change_percent) }}%
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="text-center">
+                                <i class="fas fa-spinner fa-spin fa-2x mb-2"></i>
+                                <p>Loading losers...</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- NIFTY 50 Influence Summary -->
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card dashboard-card influence-card text-white h-100">
+                <div class="card-body py-2">
+                    <h6 class="section-title mb-2" style="font-size: 1rem;">
+                        <i class="fas fa-balance-scale me-2"></i>NIFTY 50 Influence
+                    </h6>
+                    <div class="row text-center">
+                        <div class="col-12 mb-1">
+                            <div class="change-positive" id="positiveInfluence" style="font-size: 1.5rem; font-weight: bold;">
+                                {% if influence_summary %}+{{ "%.2f"|format(influence_summary.positive) }}{% else %}0.00{% endif %}
+                            </div>
+                            <div class="stat-label" style="font-size: 0.75rem;">Positive Influence</div>
+                        </div>
+                        <div class="col-12 mb-1">
+                            <div class="change-negative" id="negativeInfluence" style="font-size: 1.5rem; font-weight: bold;">
+                                {% if influence_summary %}-{{ "%.2f"|format(influence_summary.negative) }}{% else %}0.00{% endif %}
+                            </div>
+                            <div class="stat-label" style="font-size: 0.75rem;">Negative Influence</div>
+                        </div>
+                        <div class="col-12">
+                            <div class="{% if influence_summary and influence_summary.net >= 0 %}change-positive{% elif influence_summary %}change-negative{% endif %}" id="netInfluence" style="font-size: 1.5rem; font-weight: bold;">
+                                {% if influence_summary %}
+                                    {% if influence_summary.net >= 0 %}+{% endif %}{{ "%.2f"|format(influence_summary.net) }}
+                                {% else %}0.00{% endif %}
+                            </div>
+                            <div class="stat-label" style="font-size: 0.75rem;">Net Influence</div>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <div class="progress" style="height: 8px;">
+                            {% if influence_summary %}
+                                {% if influence_summary.net >= 0 %}
+                                    <div class="progress-bar bg-success" role="progressbar" style="width: 75%"></div>
+                                {% else %}
+                                    <div class="progress-bar bg-danger" role="progressbar" style="width: 75%"></div>
+                                {% endif %}
+                            {% else %}
+                                <div class="progress-bar bg-secondary" role="progressbar" style="width: 50%"></div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top 3 NIFTY + Top 3 BANKNIFTY OI Strikes -->
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card dashboard-card text-white h-100" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                <div class="card-body py-2">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="section-title mb-0" style="font-size: 1rem;">
+                            <i class="fas fa-chart-line me-2"></i>Top OI Strikes
+                        </h6>
+                        <button class="btn btn-sm btn-outline-light" onclick="refreshTopStrikes()">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                    
+                    <!-- NIFTY Section -->
+                    <div class="mb-2">
+                        <div class="bg-warning text-dark px-2 py-1 rounded mb-1" style="font-size: 0.8rem;">
+                            <i class="fas fa-chart-area me-1"></i><strong>NIFTY Top 3</strong>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm text-white" style="font-size: 0.75rem;">
+                                <thead>
+                                    <tr class="border-bottom border-secondary">
+                                        <th class="text-center" style="font-size: 0.7rem; padding: 2px;">Strike</th>
+                                        <th class="text-center" style="font-size: 0.7rem; padding: 2px;">CE%</th>
+                                        <th class="text-center" style="font-size: 0.7rem; padding: 2px;">PE%</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="niftyStrikesBody">
+                                    <tr>
+                                        <td colspan="3" class="text-center py-1">
+                                            <i class="fas fa-spinner fa-spin"></i> Loading...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- BANKNIFTY Section -->
+                    <div>
+                        <div class="bg-info text-dark px-2 py-1 rounded mb-1" style="font-size: 0.8rem;">
+                            <i class="fas fa-chart-bar me-1"></i><strong>BANKNIFTY Top 3</strong>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm text-white" style="font-size: 0.75rem;">
+                                <thead>
+                                    <tr class="border-bottom border-secondary">
+                                        <th class="text-center" style="font-size: 0.7rem; padding: 2px;">Strike</th>
+                                        <th class="text-center" style="font-size: 0.7rem; padding: 2px;">CE%</th>
+                                        <th class="text-center" style="font-size: 0.7rem; padding: 2px;">PE%</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="bankniftyStrikesBody">
+                                    <tr>
+                                        <td colspan="3" class="text-center py-1">
+                                            <i class="fas fa-spinner fa-spin"></i> Loading...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row mb-4">
+        <!-- NIFTY OI Change Chart -->
+        <div class="col-lg-6 mb-3">
+            <div class="card dashboard-card chart-card text-white">
+                <div class="card-body">
+                    <h5 class="section-title">
+                        <i class="fas fa-chart-area me-2"></i>NIFTY OI Change Analysis
+                    </h5>
+                    <div class="chart-container">
+                        <canvas id="niftyOIChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- BANKNIFTY OI Change Chart -->
+        <div class="col-lg-6 mb-3">
+            <div class="card dashboard-card chart-card text-white">
+                <div class="card-body">
+                    <h5 class="section-title">
+                        <i class="fas fa-chart-area me-2"></i>BANKNIFTY OI Change Analysis
+                    </h5>
+                    <div class="chart-container">
+                        <canvas id="bankniftyOIChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sector Performance Table -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card dashboard-card text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="section-title mb-0">
+                            <i class="fas fa-industry me-2"></i>NIFTY 50 Sector Performance
+                        </h5>
+                        <button class="btn btn-sm btn-outline-light" onclick="refreshSectorData()">
+                            <i class="fas fa-sync-alt me-1"></i>Refresh
+                        </button>
+                    </div>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover" id="sectorTable">
+                            <thead>
+                                <tr>
+                                    <th><i class="fas fa-industry me-1"></i>Sector</th>
+                                    <th class="text-center"><i class="fas fa-percentage me-1"></i>Change %</th>
+                                    <th class="text-center"><i class="fas fa-building me-1"></i>Stocks</th>
+                                    <th class="text-center"><i class="fas fa-arrow-up text-success me-1"></i>Gainers</th>
+                                    <th class="text-center"><i class="fas fa-arrow-down text-danger me-1"></i>Losers</th>
+                                    <th class="text-center"><i class="fas fa-minus text-secondary me-1"></i>Neutral</th>
+                                    <th class="text-center"><i class="fas fa-info-circle me-1"></i>Top Stocks</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sectorTableBody">
+                                <tr>
+                                    <td colspan="7" class="text-center">
+                                        <i class="fas fa-spinner fa-spin me-2"></i>Loading sector data...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-12 text-center">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Sector performance calculated using NIFTY weightage-based averages
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Debug Panel (Hidden by default) -->
+    <div class="row mb-4" id="debugPanel" style="display: none;">
+        <div class="col-12">
+            <div class="card dashboard-card text-white">
+                <div class="card-body">
+                    <h5 class="section-title">
+                        <i class="fas fa-bug me-2"></i>Market Signal Debug Information
+                    </h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>📊 Calculation Breakdown</h6>
+                            <div id="calculationBreakdown" class="small">
+                                Loading...
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>📈 Data Status</h6>
+                            <div id="dataStatus" class="small">
+                                Loading...
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <h6>🔢 Raw Values</h6>
+                        <div id="rawValues" class="small">
+                            Loading...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+let niftyChart, bankniftyChart;
+
+// Refresh indicator functions
+function showRefreshIndicator() {
+    const indicator = document.getElementById('refreshIndicator');
+    if (indicator) {
+        indicator.style.display = 'inline-block';
+        indicator.innerHTML = '<i class="fas fa-sync-alt fa-spin me-1"></i>Refreshing...';
+    }
+}
+
+function hideRefreshIndicator() {
+    const indicator = document.getElementById('refreshIndicator');
+    if (indicator) {
+        setTimeout(() => {
+            indicator.style.display = 'none';
+        }, 1000); // Show for 1 second after refresh completes
+    }
+}
+
+// Countdown timer for next refresh
+let refreshCountdown = 60;
+function updateRefreshCountdown() {
+    const countdownElement = document.getElementById('refreshCountdown');
+    if (countdownElement) {
+        countdownElement.textContent = `Next refresh in: ${refreshCountdown}s`;
+        refreshCountdown--;
+        if (refreshCountdown < 0) {
+            refreshCountdown = 60; // Reset for next cycle
+        }
+    }
+}
+
+// Update time display
+function updateTime() {
+    const now = new Date();
+    document.getElementById('updateTime').textContent = now.toLocaleTimeString();
+    
+    // Check market hours (9:00 AM - 3:45 PM IST)
+    const hour = now.getHours();
+    const minute = now.getMinutes();
+    const isMarketOpen = (hour >= 9 && hour < 15) || (hour === 15 && minute <= 45);
+    
+    const statusElement = document.getElementById('marketStatus');
+    if (isMarketOpen) {
+        statusElement.textContent = 'Market Open';
+        statusElement.className = 'market-status market-open pulse';
+    } else {
+        statusElement.textContent = 'Market Closed';
+        statusElement.className = 'market-status market-closed';
+    }
+}
+
+// Initialize signal meter
+function initSignalMeter() {
+    const canvas = document.getElementById('signalMeter');
+    const ctx = canvas.getContext('2d');
+    
+    // Set canvas size
+    canvas.width = 200;
+    canvas.height = 120;
+    
+    drawMeter(ctx, 0, 'NEUTRAL'); // Initialize with neutral
+}
+
+// Draw the meter gauge
+function drawMeter(ctx, value, signalText) {
+    const centerX = 100;
+    const centerY = 100;
+    const radius = 80;
+    
+    // Clear canvas
+    ctx.clearRect(0, 0, 200, 120);
+    
+    console.log(`Drawing meter with value: ${value}, signal: ${signalText}`);
+    
+    // Draw outer circle
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, Math.PI, 2 * Math.PI);
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 8;
+    ctx.stroke();
+    
+    // Draw colored segments
+    const segments = [
+        { start: Math.PI, end: Math.PI + Math.PI/5, color: '#ff0000', label: 'STRONG SELL' },
+        { start: Math.PI + Math.PI/5, end: Math.PI + 2*Math.PI/5, color: '#ff6347', label: 'SELL' },
+        { start: Math.PI + 2*Math.PI/5, end: Math.PI + 3*Math.PI/5, color: '#ffd700', label: 'NEUTRAL' },
+        { start: Math.PI + 3*Math.PI/5, end: Math.PI + 4*Math.PI/5, color: '#32cd32', label: 'BUY' },
+        { start: Math.PI + 4*Math.PI/5, end: 2*Math.PI, color: '#00ff00', label: 'STRONG BUY' }
+    ];
+    
+    // Draw segments
+    segments.forEach(segment => {
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, segment.start, segment.end);
+        ctx.strokeStyle = segment.color;
+        ctx.lineWidth = 6;
+        ctx.stroke();
+    });
+    
+    // Calculate needle angle based on value (-100 to +100)
+    // Ensure value is properly converted to number
+    const numericValue = parseFloat(value) || 0;
+    const normalizedValue = Math.max(-100, Math.min(100, numericValue));
+    
+    // Map -100 to +100 range to π to 2π (left to right on semicircle)
+    const angle = Math.PI + ((normalizedValue + 100) / 200) * Math.PI;
+    
+    console.log(`Needle calculation: input=${value}, numeric=${numericValue}, normalized=${normalizedValue}, angle=${angle}`);
+    
+    // Draw needle
+    ctx.save();
+    ctx.translate(centerX, centerY);
+    ctx.rotate(angle);
+    
+    // Needle shaft (make it more visible)
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(radius - 15, 0);
+    ctx.strokeStyle = '#ff0000';  // Red needle for visibility
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    
+    // Needle head
+    ctx.beginPath();
+    ctx.arc(radius - 10, 0, 6, 0, 2 * Math.PI);
+    ctx.fillStyle = '#ff0000';  // Red needle head
+    ctx.fill();
+    
+    ctx.restore();
+    
+    // Draw center circle
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, 10, 0, 2 * Math.PI);
+    ctx.fillStyle = '#333';
+    ctx.fill();
+    
+    // Draw center dot
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, 3, 0, 2 * Math.PI);
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+    
+    // Draw labels with better visibility
+    ctx.font = 'bold 11px Arial';
+    ctx.textAlign = 'center';
+    
+    // Position labels around the meter
+    const labelPositions = [
+        { x: 25, y: 95, text: 'SS' },
+        { x: 60, y: 60, text: 'S' },
+        { x: 100, y: 45, text: 'N' },
+        { x: 140, y: 60, text: 'B' },
+        { x: 175, y: 95, text: 'SB' }
+    ];
+    
+    labelPositions.forEach(pos => {
+        // Draw white outline for better visibility
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 3;
+        ctx.strokeText(pos.text, pos.x, pos.y);
+        
+        // Draw black text on top
+        ctx.fillStyle = '#000';
+        ctx.fillText(pos.text, pos.x, pos.y);
+    });
+    
+    // Add value display on meter with better visibility
+    ctx.font = 'bold 12px Arial';
+    ctx.textAlign = 'center';
+    
+    // Draw white outline for the value
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 3;
+    ctx.strokeText(`${normalizedValue}`, centerX, centerY + 25);
+    
+    // Draw black text on top
+    ctx.fillStyle = '#000';
+    ctx.fillText(`${normalizedValue}`, centerX, centerY + 25);
+}
+
+// Initialize charts
+function initCharts() {
+
+    // NIFTY OI Chart (with index price line)
+    const niftyCtx = document.getElementById('niftyOIChart').getContext('2d');
+    niftyChart = new Chart(niftyCtx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Total CE OI Change',
+                data: [],
+                borderColor: 'red',
+                backgroundColor: 'rgba(255, 0, 0, 0.1)',
+                borderWidth: 2,
+                pointRadius: 3,
+                tension: 0.1,
+                fill: false,
+                yAxisID: 'y'
+            }, {
+                label: 'Total PE OI Change',
+                data: [],
+                borderColor: 'green',
+                backgroundColor: 'rgba(0, 128, 0, 0.1)',
+                borderWidth: 2,
+                pointRadius: 3,
+                tension: 0.1,
+                fill: false,
+                yAxisID: 'y'
+            }, {
+                label: 'NIFTY Index Price',
+                data: [],
+                borderColor: 'black',
+                backgroundColor: 'rgba(0, 0, 0, 0.1)',
+                borderWidth: 2,
+                pointRadius: 2,
+                tension: 0.1,
+                fill: false,
+                yAxisID: 'y1'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'NIFTY OI Changes & Index Price',
+                    font: {
+                        size: 14,
+                        weight: 'bold'
+                    }
+                },
+                legend: {
+                    display: true,
+                    position: 'top'
+                }
+            },
+            scales: {
+                x: {
+                    display: true,
+                    title: {
+                        display: true,
+                        text: 'Time (IST)',
+                        font: {
+                            weight: 'bold'
+                        }
+                    }
+                },
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    title: {
+                        display: true,
+                        text: 'Cumulative OI Change',
+                        font: {
+                            weight: 'bold'
+                        }
+                    },
+                    ticks: {
+                        callback: function(value) {
+                            if (Math.abs(value) >= 1000000) {
+                                return (value / 1000000).toFixed(1) + 'M';
+                            } else if (Math.abs(value) >= 1000) {
+                                return (value / 1000).toFixed(1) + 'K';
+                            }
+                            return value.toLocaleString();
+                        }
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Index Price',
+                        font: {
+                            weight: 'bold'
+                        }
+                    },
+                    grid: {
+                        drawOnChartArea: false,
+                    },
+                }
+            }
+        }
+    });
+
+    // BANKNIFTY OI Chart (with index price line)
+    const bankniftyCtx = document.getElementById('bankniftyOIChart').getContext('2d');
+    bankniftyChart = new Chart(bankniftyCtx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Total CE OI Change',
+                data: [],
+                borderColor: 'red',
+                backgroundColor: 'rgba(255, 0, 0, 0.1)',
+                borderWidth: 2,
+                pointRadius: 3,
+                tension: 0.1,
+                fill: false,
+                yAxisID: 'y'
+            }, {
+                label: 'Total PE OI Change',
+                data: [],
+                borderColor: 'green',
+                backgroundColor: 'rgba(0, 128, 0, 0.1)',
+                borderWidth: 2,
+                pointRadius: 3,
+                tension: 0.1,
+                fill: false,
+                yAxisID: 'y'
+            }, {
+                label: 'BANKNIFTY Index Price',
+                data: [],
+                borderColor: 'black',
+                backgroundColor: 'rgba(0, 0, 0, 0.1)',
+                borderWidth: 2,
+                pointRadius: 2,
+                tension: 0.1,
+                fill: false,
+                yAxisID: 'y1'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'BANKNIFTY OI Changes & Index Price',
+                    font: {
+                        size: 14,
+                        weight: 'bold'
+                    }
+                },
+                legend: {
+                    display: true,
+                    position: 'top'
+                }
+            },
+            scales: {
+                x: {
+                    display: true,
+                    title: {
+                        display: true,
+                        text: 'Time (IST)',
+                        font: {
+                            weight: 'bold'
+                        }
+                    }
+                },
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    title: {
+                        display: true,
+                        text: 'Cumulative OI Change',
+                        font: {
+                            weight: 'bold'
+                        }
+                    },
+                    ticks: {
+                        callback: function(value) {
+                            if (Math.abs(value) >= 1000000) {
+                                return (value / 1000000).toFixed(1) + 'M';
+                            } else if (Math.abs(value) >= 1000) {
+                                return (value / 1000).toFixed(1) + 'K';
+                            }
+                            return value.toLocaleString();
+                        }
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Index Price',
+                        font: {
+                            weight: 'bold'
+                        }
+                    },
+                    grid: {
+                        drawOnChartArea: false,
+                    },
+                }
+            }
+        }
+    });
+}
+
+// Load OI data for charts (matching original OI analysis implementation)
+async function loadOIData(underlying) {
+    try {
+        const response = await fetch(`/api/oi-changes-timeline?underlying=${underlying}`);
+        const data = await response.json();
+        if (data.success) {
+            return data.data;
+        }
+        return { labels: [], ce_changes: [], pe_changes: [] };
+    } catch (error) {
+        console.error(`Error loading ${underlying} OI data:`, error);
+        return { labels: [], ce_changes: [], pe_changes: [] };
+    }
+}
+
+// Toggle debug panel
+function toggleDebugPanel() {
+    const panel = document.getElementById('debugPanel');
+    const button = document.getElementById('debugToggle');
+    
+    if (panel.style.display === 'none') {
+        panel.style.display = 'block';
+        button.innerHTML = '<i class="fas fa-cog me-1"></i>Hide Debug';
+        loadDebugInfo();
+    } else {
+        panel.style.display = 'none';
+        button.innerHTML = '<i class="fas fa-cog me-1"></i>Debug';
+    }
+}
+
+// Load debug information
+async function loadDebugInfo() {
+    try {
+        const response = await fetch('/api/market-signal-debug');
+        const data = await response.json();
+        
+        if (data.success) {
+            // Display calculation breakdown
+            const breakdown = data.signal_data.calculation_breakdown || {};
+            let breakdownHtml = '<table class="table table-sm table-dark">';
+            breakdownHtml += '<tr><th>Factor</th><th>Value</th><th>Score</th><th>Reason</th></tr>';
+            
+            Object.keys(breakdown).forEach(key => {
+                const item = breakdown[key];
+                breakdownHtml += `<tr>
+                    <td><strong>${key.replace('_', ' ').toUpperCase()}</strong></td>
+                    <td>${JSON.stringify(item.value)}</td>
+                    <td class="${item.score > 0 ? 'text-success' : item.score < 0 ? 'text-danger' : 'text-warning'}">${item.score > 0 ? '+' : ''}${item.score}</td>
+                    <td>${item.reason}</td>
+                </tr>`;
+            });
+            breakdownHtml += `<tr class="table-info">
+                <td><strong>TOTAL</strong></td>
+                <td>-</td>
+                <td class="${data.signal_data.signal_score > 0 ? 'text-success' : data.signal_data.signal_score < 0 ? 'text-danger' : 'text-warning'}">
+                    <strong>${data.signal_data.signal_score > 0 ? '+' : ''}${data.signal_data.signal_score}</strong>
+                </td>
+                <td><strong>${data.signal_data.signal_text}</strong></td>
+            </tr>`;
+            breakdownHtml += '</table>';
+            document.getElementById('calculationBreakdown').innerHTML = breakdownHtml;
+            
+            // Display data status
+            const debug = data.debug_info;
+            let statusHtml = `
+                <p><strong>Current Time (IST):</strong> ${debug.current_time_ist}</p>
+                <p><strong>Market Hours:</strong> ${debug.market_hours_check}</p>
+                <h6>📊 Data Counts (Last 24h)</h6>
+                <ul>
+                    <li>NIFTY Prices: ${debug.data_counts.nifty_prices_24h}</li>
+                    <li>BANKNIFTY Prices: ${debug.data_counts.banknifty_prices_24h}</li>
+                    <li>NIFTY Options: ${debug.data_counts.nifty_options_24h}</li>
+                    <li>BANKNIFTY Options: ${debug.data_counts.banknifty_options_24h}</li>
+                </ul>
+            `;
+            document.getElementById('dataStatus').innerHTML = statusHtml;
+            
+            // Display raw values
+            let rawHtml = `
+                <h6>💰 Latest Prices</h6>
+                <p><strong>NIFTY:</strong> ₹${debug.latest_data.nifty.price || 'N/A'} 
+                   (${debug.latest_data.nifty.timestamp || 'N/A'})</p>
+                <p><strong>BANKNIFTY:</strong> ₹${debug.latest_data.banknifty.price || 'N/A'} 
+                   (${debug.latest_data.banknifty.timestamp || 'N/A'})</p>
+                <h6>📈 Signal Details</h6>
+                <pre class="small">${JSON.stringify(data.signal_data.details, null, 2)}</pre>
+            `;
+            document.getElementById('rawValues').innerHTML = rawHtml;
+        }
+    } catch (error) {
+        document.getElementById('calculationBreakdown').innerHTML = `<p class="text-danger">Error: ${error.message}</p>`;
+        document.getElementById('dataStatus').innerHTML = `<p class="text-danger">Error: ${error.message}</p>`;
+        document.getElementById('rawValues').innerHTML = `<p class="text-danger">Error: ${error.message}</p>`;
+    }
+}
+
+// Load and update market signal meter
+async function updateMarketSignal() {
+    try {
+        const response = await fetch('/api/market-signal');
+        const data = await response.json();
+        
+        console.log('Market signal response:', data);
+        
+        if (data.success && data.data) {
+            const signalData = data.data;
+            
+            // Update meter gauge
+            const canvas = document.getElementById('signalMeter');
+            const ctx = canvas.getContext('2d');
+            console.log('Updating meter with:', signalData.signal_score, signalData.signal_text);
+            drawMeter(ctx, signalData.signal_score, signalData.signal_text);
+            
+            // Update text displays
+            document.getElementById('signalText').textContent = signalData.signal_text;
+            document.getElementById('signalText').style.color = signalData.signal_color;
+            document.getElementById('signalScore').textContent = signalData.signal_score > 0 ? 
+                `+${signalData.signal_score}` : signalData.signal_score;
+            
+            // Update indicator badges
+            if (signalData.details) {
+                const niftyChange = signalData.details.nifty_change || 0;
+                const bankniftyChange = signalData.details.banknifty_change || 0;
+                
+                // NIFTY indicator
+                const niftyBadge = document.getElementById('niftyIndicator');
+                niftyBadge.textContent = `NIFTY: ${niftyChange >= 0 ? '+' : ''}${niftyChange.toFixed(2)}%`;
+                niftyBadge.className = `badge me-1 ${niftyChange > 0 ? 'bg-success' : niftyChange < 0 ? 'bg-danger' : 'bg-secondary'}`;
+                
+                // BANKNIFTY indicator
+                const bankniftyBadge = document.getElementById('bankniftyIndicator');
+                bankniftyBadge.textContent = `BNF: ${bankniftyChange >= 0 ? '+' : ''}${bankniftyChange.toFixed(2)}%`;
+                bankniftyBadge.className = `badge me-1 ${bankniftyChange > 0 ? 'bg-success' : bankniftyChange < 0 ? 'bg-danger' : 'bg-secondary'}`;
+                
+                // NIFTY OI indicator
+                const niftyOiBadge = document.getElementById('niftyOiIndicator');
+                if (signalData.details.nifty_oi) {
+                    const oiData = signalData.details.nifty_oi;
+                    console.log('NIFTY OI Data:', oiData);
+                    let oiText = '';
+                    let oiClass = 'badge bg-secondary';
+                    
+                    // Calculate net OI change: PE% - CE% 
+                    const ceChangePct = oiData.ce_change_pct || 0;
+                    const peChangePct = oiData.pe_change_pct || 0;
+                    const ceTotal = oiData.ce_total || 0;
+                    const peTotal = oiData.pe_total || 0;
+                    const netOiChange = peChangePct - ceChangePct;  // PE% - CE%
+                    
+                    // Check if we have actual data or if it's truly no data
+                    if (Math.abs(ceChangePct) < 0.01 && Math.abs(peChangePct) < 0.01 && ceTotal === 0 && peTotal === 0) {
+                        // No data case
+                        oiText = 'N-OIC: No Data';
+                        oiClass = 'badge bg-secondary me-1';
+                    } else {
+                        // Always show net difference: PE% - CE%
+                        oiText = `N-OIC: ${netOiChange >= 0 ? '+' : ''}${netOiChange.toFixed(1)}%`;
+                        
+                        // Color based on net difference
+                        if (Math.abs(netOiChange) < 1) {
+                            oiClass = 'badge bg-secondary me-1';  // Neutral (< 1% difference)
+                        } else if (netOiChange > 0) {
+                            oiClass = 'badge bg-success me-1';    // Bullish (PE > CE)
+                        } else {
+                            oiClass = 'badge bg-danger me-1';     // Bearish (CE > PE)
+                        }
+                    }
+                    
+                    niftyOiBadge.textContent = oiText;
+                    niftyOiBadge.className = oiClass;
+                } else {
+                    console.log('No NIFTY OI data available');
+                    niftyOiBadge.textContent = 'N-OI: No Data';
+                    niftyOiBadge.className = 'badge bg-secondary me-1';
+                }
+                
+                // BANKNIFTY OI indicator  
+                const bankniftyOiBadge = document.getElementById('bankniftyOiIndicator');
+                if (signalData.details.banknifty_oi) {
+                    const oiData = signalData.details.banknifty_oi;
+                    console.log('BANKNIFTY OI Data:', oiData);
+                    let oiText = '';
+                    let oiClass = 'badge bg-secondary';
+                    
+                    // Calculate net OI change: PE% - CE%
+                    const ceChangePct = oiData.ce_change_pct || 0;
+                    const peChangePct = oiData.pe_change_pct || 0;
+                    const ceTotal = oiData.ce_total || 0;
+                    const peTotal = oiData.pe_total || 0;
+                    const netOiChange = peChangePct - ceChangePct;  // PE% - CE%
+                    
+                    // Check if we have actual data or if it's truly no data
+                    if (Math.abs(ceChangePct) < 0.01 && Math.abs(peChangePct) < 0.01 && ceTotal === 0 && peTotal === 0) {
+                        // No data case
+                        oiText = 'BNF-OIC: No Data';
+                        oiClass = 'badge bg-secondary';
+                    } else {
+                        // Always show net difference: PE% - CE%
+                        oiText = `BNF-OIC: ${netOiChange >= 0 ? '+' : ''}${netOiChange.toFixed(1)}%`;
+                        
+                        // Color based on net difference
+                        if (Math.abs(netOiChange) < 1) {
+                            oiClass = 'badge bg-secondary';       // Neutral (< 1% difference)
+                        } else if (netOiChange > 0) {
+                            oiClass = 'badge bg-success';         // Bullish (PE > CE)
+                        } else {
+                            oiClass = 'badge bg-danger';          // Bearish (CE > PE)
+                        }
+                    }
+                    
+                    bankniftyOiBadge.textContent = oiText;
+                    bankniftyOiBadge.className = oiClass;
+                } else {
+                    console.log('No BANKNIFTY OI data available');
+                    bankniftyOiBadge.textContent = 'BNF-OI: No Data';
+                    bankniftyOiBadge.className = 'badge bg-secondary';
+                }
+                
+                // Net Influence indicator
+                const netInfluenceBadge = document.getElementById('netInfluenceIndicator');
+                if (signalData.details.net_influence) {
+                    const influenceData = signalData.details.net_influence;
+                    console.log('Net Influence Data:', influenceData);
+                    let influenceText = '';
+                    let influenceClass = 'badge bg-secondary';
+                    
+                    const netValue = influenceData.value || 0;
+                    if (Math.abs(netValue) < 0.5) {
+                        influenceText = 'NET: Neutral';
+                        influenceClass = 'badge bg-secondary';
+                    } else if (netValue > 0) {
+                        influenceText = `NET: +${Math.abs(netValue).toFixed(1)}%`;
+                        influenceClass = 'badge bg-success';  // Positive/Bullish
+                    } else {
+                        influenceText = `NET: -${Math.abs(netValue).toFixed(1)}%`;
+                        influenceClass = 'badge bg-danger';   // Negative/Bearish
+                    }
+                    
+                    netInfluenceBadge.textContent = influenceText;
+                    netInfluenceBadge.className = influenceClass;
+                } else {
+                    console.log('No Net Influence data available');
+                    netInfluenceBadge.textContent = 'NET: No Data';
+                    netInfluenceBadge.className = 'badge bg-secondary';
+                }
+                
+                // Add breakdown summary in console
+                console.log('5-Factor Signal Breakdown:', {
+                    nifty_price: `${niftyChange.toFixed(2)}%`,
+                    banknifty_price: `${bankniftyChange.toFixed(2)}%`,
+                    nifty_oi: signalData.details.nifty_oi ? signalData.details.nifty_oi.interpretation : 'No data',
+                    banknifty_oi: signalData.details.banknifty_oi ? signalData.details.banknifty_oi.interpretation : 'No data',
+                    net_influence: signalData.details.net_influence ? signalData.details.net_influence.interpretation : 'No data',
+                    total_score: signalData.signal_score,
+                    final_signal: signalData.signal_text
+                });
+            }
+            
+            // Update debug panel if it's open
+            if (document.getElementById('debugPanel').style.display !== 'none') {
+                loadDebugInfo();
+            }
+        }
+    } catch (error) {
+        console.error('Error updating market signal:', error);
+        // Show neutral on error
+        const canvas = document.getElementById('signalMeter');
+        const ctx = canvas.getContext('2d');
+        drawMeter(ctx, 0, 'NEUTRAL');
+    }
+}
+
+// Update charts with data
+async function updateCharts() {
+    // Load NIFTY data (with index price)
+    const niftyData = await loadOIData('NIFTY');
+    if (niftyData.labels && niftyData.labels.length > 0) {
+        niftyChart.data.labels = niftyData.labels;
+        niftyChart.data.datasets[0].data = niftyData.ce_changes; // CE OI Change (Red)
+        niftyChart.data.datasets[1].data = niftyData.pe_changes; // PE OI Change (Green)
+        niftyChart.data.datasets[2].data = niftyData.index_prices; // NIFTY Index Price (Black)
+        niftyChart.update();
+    }
+
+    // Load BANKNIFTY data (with index price)
+    const bankniftyData = await loadOIData('BANKNIFTY');
+    if (bankniftyData.labels && bankniftyData.labels.length > 0) {
+        bankniftyChart.data.labels = bankniftyData.labels;
+        bankniftyChart.data.datasets[0].data = bankniftyData.ce_changes; // CE OI Change (Red)
+        bankniftyChart.data.datasets[1].data = bankniftyData.pe_changes; // PE OI Change (Green)
+        bankniftyChart.data.datasets[2].data = bankniftyData.index_prices; // BANKNIFTY Index Price (Black)
+        bankniftyChart.update();
+    }
+}
+
+// Refresh dashboard data
+async function refreshDashboard() {
+    try {
+        const response = await fetch('/api/dashboard-comprehensive');
+        const data = await response.json();
+        
+        // Update prices in combined display
+        if (data.nifty_price) {
+            document.getElementById('niftyPrice').textContent = `₹${data.nifty_price.price.toFixed(2)}`;
+            const changeElement = document.getElementById('niftyChange');
+            const change = data.nifty_price.change_percent;
+            changeElement.innerHTML = change >= 0 ? 
+                `<i class="fas fa-arrow-up me-1"></i><span class="change-positive">+${change.toFixed(2)}%</span>` :
+                `<i class="fas fa-arrow-down me-1"></i><span class="change-negative">${change.toFixed(2)}%</span>`;
+        }
+        
+        if (data.banknifty_price) {
+            document.getElementById('bankniftyPrice').textContent = `₹${data.banknifty_price.price.toFixed(2)}`;
+            const changeElement = document.getElementById('bankniftyChange');
+            const change = data.banknifty_price.change_percent;
+            changeElement.innerHTML = change >= 0 ? 
+                `<i class="fas fa-arrow-up me-1"></i><span class="change-positive">+${change.toFixed(2)}%</span>` :
+                `<i class="fas fa-arrow-down me-1"></i><span class="change-negative">${change.toFixed(2)}%</span>`;
+        }
+        
+        // Update influence summary
+        if (data.influence_summary) {
+            document.getElementById('positiveInfluence').textContent = `+${data.influence_summary.positive.toFixed(2)}`;
+            document.getElementById('negativeInfluence').textContent = `-${Math.abs(data.influence_summary.negative).toFixed(2)}`;
+            
+            // Calculate net influence: Positive - Negative
+            const netInfluence = data.influence_summary.positive - Math.abs(data.influence_summary.negative);
+            const netElement = document.getElementById('netInfluence');
+            netElement.textContent = `${netInfluence >= 0 ? '+' : ''}${netInfluence.toFixed(2)}`;
+            
+            // Set color based on net influence
+            if (netInfluence >= 0) {
+                netElement.className = 'stat-value change-positive';
+            } else {
+                netElement.className = 'stat-value change-negative';
+            }
+        }
+        
+        // Update top gainers
+        if (data.top_gainers) {
+            updateTopStocks('gainers', data.top_gainers);
+        }
+        
+        // Update top losers  
+        if (data.top_losers) {
+            updateTopStocks('losers', data.top_losers);
+        }
+    } catch (error) {
+        console.error('Error refreshing dashboard:', error);
+    }
+}
+
+// Update top gainers/losers dynamically
+function updateTopStocks(type, stocks) {
+    const containerId = type === 'gainers' ? 'gainersContainer' : 'losersContainer';
+    const container = document.getElementById(containerId);
+    
+    if (!container || !stocks || stocks.length === 0) return;
+    
+    container.innerHTML = '';
+    
+    stocks.forEach(stock => {
+        const cardClass = type === 'gainers' ? 'gainer-card' : 'loser-card';
+        const changeClass = type === 'gainers' ? 'change-positive' : 'change-negative';
+        const iconClass = type === 'gainers' ? 'fa-arrow-up' : 'fa-arrow-down';
+        const changePrefix = type === 'gainers' ? '+' : '';
+        
+        const stockCard = `
+            <div class="col-12 mb-2">
+                <div class="card ${cardClass} h-100">
+                    <div class="card-body p-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-title mb-1">${stock.symbol}</h6>
+                                <small class="text-muted">${stock.company_name}</small>
+                            </div>
+                            <div class="text-end">
+                                <div class="fs-6 fw-bold">₹${stock.current_price.toFixed(2)}</div>
+                                <div class="${changeClass}">
+                                    <i class="fas ${iconClass} me-1"></i>${changePrefix}${stock.change_percent.toFixed(2)}%
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        container.innerHTML += stockCard;
+    });
+}
+
+// Load and update sector performance data
+async function loadSectorData() {
+    try {
+        const response = await fetch('/api/sector-performance');
+        const data = await response.json();
+        
+        if (data.success && data.data) {
+            updateSectorTable(data.data);
+        } else {
+            console.error('Error loading sector data:', data.error);
+            showSectorError('Failed to load sector data');
+        }
+    } catch (error) {
+        console.error('Error fetching sector data:', error);
+        showSectorError('Network error loading sector data');
+    }
+}
+
+function updateSectorTable(sectors) {
+    const tbody = document.getElementById('sectorTableBody');
+    if (!tbody || !sectors || sectors.length === 0) {
+        showSectorError('No sector data available');
+        return;
+    }
+    
+    tbody.innerHTML = '';
+    
+    sectors.forEach(sector => {
+        const changeClass = sector.weighted_change_percent > 0 ? 'text-success' : 
+                           sector.weighted_change_percent < 0 ? 'text-danger' : 'text-secondary';
+        const changeIcon = sector.weighted_change_percent > 0 ? 'fa-arrow-up' : 
+                          sector.weighted_change_percent < 0 ? 'fa-arrow-down' : 'fa-minus';
+        
+        // Get top 3 stocks for display
+        const topStocks = sector.stocks.slice(0, 3).map(stock => 
+            `<span class="badge ${stock.change_percent > 0 ? 'bg-success' : stock.change_percent < 0 ? 'bg-danger' : 'bg-secondary'} me-1">
+                ${stock.symbol}: ${stock.change_percent > 0 ? '+' : ''}${stock.change_percent.toFixed(1)}%
+            </span>`
+        ).join('');
+        
+        const row = `
+            <tr>
+                <td><strong>${sector.sector}</strong></td>
+                <td class="text-center">
+                    <span class="${changeClass}">
+                        <i class="fas ${changeIcon} me-1"></i>
+                        ${sector.weighted_change_percent > 0 ? '+' : ''}${sector.weighted_change_percent.toFixed(2)}%
+                    </span>
+                </td>
+                <td class="text-center">${sector.stock_count}</td>
+                <td class="text-center">
+                    <span class="badge bg-success">${sector.gainers}</span>
+                </td>
+                <td class="text-center">
+                    <span class="badge bg-danger">${sector.losers}</span>
+                </td>
+                <td class="text-center">
+                    <span class="badge bg-secondary">${sector.neutral}</span>
+                </td>
+                <td class="text-center">
+                    <div style="max-width: 300px; overflow: hidden;">${topStocks}</div>
+                </td>
+            </tr>
+        `;
+        
+        tbody.innerHTML += row;
+    });
+}
+
+function showSectorError(message) {
+    const tbody = document.getElementById('sectorTableBody');
+    if (tbody) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" class="text-center text-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>${message}
+                </td>
+            </tr>
+        `;
+    }
+}
+
+function refreshSectorData() {
+    const tbody = document.getElementById('sectorTableBody');
+    if (tbody) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" class="text-center">
+                    <i class="fas fa-spinner fa-spin me-2"></i>Refreshing sector data...
+                </td>
+            </tr>
+        `;
+    }
+    loadSectorData();
+}
+
+// Load and update top OI strikes data
+async function loadTopStrikes() {
+    try {
+        const response = await fetch('/api/top-oi-strikes');
+        const data = await response.json();
+        
+        if (data.success && data.data) {
+            updateTopStrikesTable(data.data);
+        } else {
+            console.error('Error loading top strikes:', data.error);
+            showTopStrikesError('Failed to load OI strikes');
+        }
+    } catch (error) {
+        console.error('Error fetching top strikes:', error);
+        showTopStrikesError('Network error');
+    }
+}
+
+function updateTopStrikesTable(data) {
+    const niftyTbody = document.getElementById('niftyStrikesBody');
+    const bankniftyTbody = document.getElementById('bankniftyStrikesBody');
+    
+    if (!niftyTbody || !bankniftyTbody) return;
+    
+    // Update NIFTY strikes (top 3)
+    const niftyStrikes = (data.NIFTY || []).slice(0, 3);
+    if (niftyStrikes.length === 0) {
+        niftyTbody.innerHTML = `
+            <tr>
+                <td colspan="3" class="text-center py-1 text-warning">
+                    <small>No NIFTY OI data</small>
+                </td>
+            </tr>
+        `;
+    } else {
+        niftyTbody.innerHTML = '';
+        niftyStrikes.forEach(strike => {
+            const ceClass = strike.ce_change_pct > 0 ? 'text-success' : strike.ce_change_pct < 0 ? 'text-danger' : 'text-secondary';
+            const peClass = strike.pe_change_pct > 0 ? 'text-success' : strike.pe_change_pct < 0 ? 'text-danger' : 'text-secondary';
+            
+            const row = `
+                <tr>
+                    <td><small><strong>${strike.strike}</strong></small></td>
+                    <td class="text-center ${ceClass}">
+                        <small>${strike.ce_change_pct > 0 ? '+' : ''}${strike.ce_change_pct}%</small>
+                    </td>
+                    <td class="text-center ${peClass}">
+                        <small>${strike.pe_change_pct > 0 ? '+' : ''}${strike.pe_change_pct}%</small>
+                    </td>
+                </tr>
+            `;
+            niftyTbody.innerHTML += row;
+        });
+    }
+    
+    // Update BANKNIFTY strikes (top 3)
+    const bankniftyStrikes = (data.BANKNIFTY || []).slice(0, 3);
+    if (bankniftyStrikes.length === 0) {
+        bankniftyTbody.innerHTML = `
+            <tr>
+                <td colspan="3" class="text-center py-1 text-warning">
+                    <small>No BANKNIFTY OI data</small>
+                </td>
+            </tr>
+        `;
+    } else {
+        bankniftyTbody.innerHTML = '';
+        bankniftyStrikes.forEach(strike => {
+            const ceClass = strike.ce_change_pct > 0 ? 'text-success' : strike.ce_change_pct < 0 ? 'text-danger' : 'text-secondary';
+            const peClass = strike.pe_change_pct > 0 ? 'text-success' : strike.pe_change_pct < 0 ? 'text-danger' : 'text-secondary';
+            
+            const row = `
+                <tr>
+                    <td><small><strong>${strike.strike}</strong></small></td>
+                    <td class="text-center ${ceClass}">
+                        <small>${strike.ce_change_pct > 0 ? '+' : ''}${strike.ce_change_pct}%</small>
+                    </td>
+                    <td class="text-center ${peClass}">
+                        <small>${strike.pe_change_pct > 0 ? '+' : ''}${strike.pe_change_pct}%</small>
+                    </td>
+                </tr>
+            `;
+            bankniftyTbody.innerHTML += row;
+        });
+    }
+}
+
+function showTopStrikesError(message) {
+    const niftyTbody = document.getElementById('niftyStrikesBody');
+    const bankniftyTbody = document.getElementById('bankniftyStrikesBody');
+    
+    if (niftyTbody) {
+        niftyTbody.innerHTML = `
+            <tr>
+                <td colspan="3" class="text-center text-warning py-1">
+                    <small><i class="fas fa-exclamation-triangle me-1"></i>${message}</small>
+                </td>
+            </tr>
+        `;
+    }
+    
+    if (bankniftyTbody) {
+        bankniftyTbody.innerHTML = `
+            <tr>
+                <td colspan="3" class="text-center text-warning py-1">
+                    <small><i class="fas fa-exclamation-triangle me-1"></i>${message}</small>
+                </td>
+            </tr>
+        `;
+    }
+}
+
+function refreshTopStrikes() {
+    const niftyTbody = document.getElementById('niftyStrikesBody');
+    const bankniftyTbody = document.getElementById('bankniftyStrikesBody');
+    
+    if (niftyTbody) {
+        niftyTbody.innerHTML = `
+            <tr>
+                <td colspan="3" class="text-center py-1">
+                    <small><i class="fas fa-spinner fa-spin me-1"></i>Refreshing...</small>
+                </td>
+            </tr>
+        `;
+    }
+    
+    if (bankniftyTbody) {
+        bankniftyTbody.innerHTML = `
+            <tr>
+                <td colspan="3" class="text-center py-1">
+                    <small><i class="fas fa-spinner fa-spin me-1"></i>Refreshing...</small>
+                </td>
+            </tr>
+        `;
+    }
+    
+    loadTopStrikes();
+}
+
+// Initialize everything
+document.addEventListener('DOMContentLoaded', function() {
+    updateTime();
+    initSignalMeter();
+    initCharts();
+    updateCharts();
+    updateMarketSignal();
+    loadSectorData();
+    loadTopStrikes();
+    
+    // Start countdown timer (updates every second)
+    setInterval(updateRefreshCountdown, 1000);
+    
+    // Auto-refresh every 60 seconds (1 minute)
+    setInterval(async () => {
+        console.log('Auto-refreshing dashboard data...', new Date().toLocaleTimeString());
+        showRefreshIndicator();
+        refreshCountdown = 60; // Reset countdown
+        
+        try {
+            // Update all dashboard components
+            updateTime();
+            await refreshDashboard();
+            await updateCharts();
+            await updateMarketSignal();
+            await loadSectorData();
+            await loadTopStrikes();
+            
+            console.log('Dashboard refresh completed successfully');
+        } catch (error) {
+            console.error('Error during dashboard refresh:', error);
+        } finally {
+            hideRefreshIndicator();
+        }
+    }, 60000);
+    
+    // Add manual refresh button functionality
+    window.manualRefresh = async function() {
+        showRefreshIndicator();
+        refreshCountdown = 60; // Reset countdown after manual refresh
+        try {
+            updateTime();
+            await refreshDashboard();
+            await updateCharts();
+            await updateMarketSignal();
+            await loadSectorData();
+            await loadTopStrikes();
+        } catch (error) {
+            console.error('Error during manual refresh:', error);
+        } finally {
+            hideRefreshIndicator();
+        }
+    };
+});
+</script>
+{% endblock %}
