@@ -30,6 +30,14 @@ class BankNiftyPrice(db.Model):
     
     @classmethod
     def save_price(cls, price_data):
+        """Save BANKNIFTY price data - only during market hours (9:00 AM to 3:45 PM IST)"""
+        from app.utils.datetime_utils import is_market_hours
+        
+        # Check if current time is within market hours
+        if not is_market_hours():
+            print("Skipping BANKNIFTY price collection - outside market hours (9:00 AM - 3:45 PM IST)")
+            return None
+            
         new_price = cls(
             symbol=price_data.get('symbol', 'NIFTY BANK'),
             price=price_data['price'],
@@ -164,7 +172,14 @@ class OptionChainData(db.Model):
     
     @classmethod
     def save_option_data(cls, option_data):
-        """Save or update option chain data"""
+        """Save or update option chain data - only during market hours (9:00 AM to 3:45 PM IST)"""
+        from app.utils.datetime_utils import is_market_hours
+        
+        # Check if current time is within market hours
+        if not is_market_hours():
+            print("Skipping data collection - outside market hours (9:00 AM - 3:45 PM IST)")
+            return None
+        
         # Validate OI data - skip if both CE and PE OI are zero or None
         ce_oi = option_data.get('ce_oi', 0) or 0
         pe_oi = option_data.get('pe_oi', 0) or 0
@@ -361,6 +376,14 @@ class MarketTrend(db.Model):
     
     @classmethod
     def save_trend_data(cls, trend_data):
+        """Save market trend data - only during market hours (9:00 AM to 3:45 PM IST)"""
+        from app.utils.datetime_utils import is_market_hours
+        
+        # Check if current time is within market hours
+        if not is_market_hours():
+            print("Skipping trend data collection - outside market hours (9:00 AM - 3:45 PM IST)")
+            return None
+            
         new_trend = cls(
             underlying=trend_data['underlying'],
             expiry_date=trend_data['expiry_date'],

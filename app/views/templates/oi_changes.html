@@ -272,6 +272,55 @@
         </div>
     </div>
 
+    <!-- OI Change Analysis Chart -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-line me-2"></i>OI Change Analysis - Timeline
+                        </h5>
+                        <button class="btn btn-sm btn-outline-light" id="refreshChartBtn" onclick="loadChartData()">
+                            <i class="fas fa-sync-alt"></i> Refresh Chart
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <div class="d-flex justify-content-center gap-4">
+                                <div class="d-flex align-items-center">
+                                    <div style="width: 20px; height: 3px; background-color: red; margin-right: 8px;"></div>
+                                    <small><strong>Total CE OI Change</strong></small>
+                                </div>
+                                <div class="d-flex align-items-center">
+                                    <div style="width: 20px; height: 3px; background-color: green; margin-right: 8px;"></div>
+                                    <small><strong>Total PE OI Change</strong></small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-12">
+                            <div style="position: relative; height: 400px;">
+                                <canvas id="oiChangeChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-12 text-center">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle"></i> 
+                                Chart shows cumulative OI changes from start of day
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Summary Stats -->
     <div class="row">
         <div class="col-12">
@@ -420,7 +469,182 @@ function updateTable(tableId, records, type) {
     });
 }
 
-// Auto-refresh every 2 minutes
-setInterval(refreshData, 120000);
+// Chart functionality
+let oiChangeChart = null;
+
+function loadChartData() {
+    const refreshBtn = document.getElementById('refreshChartBtn');
+    const originalHtml = refreshBtn.innerHTML;
+    
+    // Show loading state
+    refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+    refreshBtn.disabled = true;
+    
+    fetch('/api/oi-changes-timeline')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateChart(data.data);
+            } else {
+                throw new Error(data.error || 'Failed to load chart data');
+            }
+        })
+        .catch(error => {
+            console.error('Error loading chart data:', error);
+            alert('Error loading chart data: ' + error.message);
+        })
+        .finally(() => {
+            refreshBtn.innerHTML = originalHtml;
+            refreshBtn.disabled = false;
+        });
+}
+
+function updateChart(chartData) {
+    const ctx = document.getElementById('oiChangeChart').getContext('2d');
+    
+    // Destroy existing chart if it exists
+    if (oiChangeChart) {
+        oiChangeChart.destroy();
+    }
+    
+    oiChangeChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: chartData.labels,
+            datasets: [
+                {
+                    label: 'Total CE OI Change',
+                    data: chartData.ce_changes,
+                    borderColor: 'red',
+                    backgroundColor: 'rgba(255, 0, 0, 0.1)',
+                    borderWidth: 2,
+                    pointRadius: 3,
+                    pointHoverRadius: 5,
+                    tension: 0.1,
+                    fill: false
+                },
+                {
+                    label: 'Total PE OI Change',
+                    data: chartData.pe_changes,
+                    borderColor: 'green',
+                    backgroundColor: 'rgba(0, 128, 0, 0.1)',
+                    borderWidth: 2,
+                    pointRadius: 3,
+                    pointHoverRadius: 5,
+                    tension: 0.1,
+                    fill: false
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'NIFTY OI Changes Throughout the Day',
+                    font: {
+                        size: 16,
+                        weight: 'bold'
+                    }
+                },
+                legend: {
+                    display: true,
+                    position: 'top',
+                    labels: {
+                        usePointStyle: true,
+                        font: {
+                            weight: 'bold'
+                        }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        title: function(context) {
+                            return `Time: ${context[0].label}`;
+                        },
+                        label: function(context) {
+                            const value = context.parsed.y;
+                            const formattedValue = Math.abs(value).toLocaleString();
+                            const sign = value >= 0 ? '+' : '-';
+                            return `${context.dataset.label}: ${sign}${formattedValue}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    display: true,
+                    title: {
+                        display: true,
+                        text: 'Time (IST)',
+                        font: {
+                            weight: 'bold',
+                            size: 14
+                        }
+                    },
+                    ticks: {
+                        maxTicksLimit: 12 // Show max 12 time labels to avoid crowding
+                    }
+                },
+                y: {
+                    display: true,
+                    title: {
+                        display: true,
+                        text: 'Cumulative OI Change',
+                        font: {
+                            weight: 'bold',
+                            size: 14
+                        }
+                    },
+                    ticks: {
+                        callback: function(value) {
+                            // Format large numbers with K/M suffixes
+                            if (Math.abs(value) >= 1000000) {
+                                return (value / 1000000).toFixed(1) + 'M';
+                            } else if (Math.abs(value) >= 1000) {
+                                return (value / 1000).toFixed(1) + 'K';
+                            }
+                            return value.toLocaleString();
+                        }
+                    },
+                    // Add a horizontal line at zero
+                    grid: {
+                        color: function(context) {
+                            if (context.tick.value === 0) {
+                                return 'rgba(0, 0, 0, 0.8)';
+                            }
+                            return 'rgba(0, 0, 0, 0.1)';
+                        },
+                        lineWidth: function(context) {
+                            if (context.tick.value === 0) {
+                                return 2;
+                            }
+                            return 1;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Load chart data on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadChartData();
+});
+
+// Auto-refresh every 2 minutes (both tables and chart)
+setInterval(() => {
+    refreshData();
+    loadChartData();
+}, 120000);
 </script>
+
+<!-- Include Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 {% endblock %}

@@ -30,6 +30,14 @@ class NiftyPrice(db.Model):
     
     @classmethod
     def save_price(cls, price_data):
+        """Save NIFTY price data - only during market hours (9:00 AM to 3:45 PM IST)"""
+        from app.utils.datetime_utils import is_market_hours
+        
+        # Check if current time is within market hours
+        if not is_market_hours():
+            print("Skipping NIFTY price collection - outside market hours (9:00 AM - 3:45 PM IST)")
+            return None
+            
         new_price = cls(
             symbol=price_data.get('symbol', 'NIFTY 50'),
             price=price_data['price'],

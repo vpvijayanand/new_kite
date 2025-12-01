@@ -223,3 +223,17 @@ def strategy_analysis_page():
     """Display strategy analysis page"""
     return render_template('strategy_analysis.html', 
                          current_time=datetime.now())
+
+@market_bp.route('/all-oi-analysis')
+@login_required
+def all_oi_analysis_page():
+    """Display all OI analysis page"""
+    return render_template('all_oi_analysis.html', 
+                         current_time=datetime.now())
+
+@market_bp.route('/nifty-stocks')
+@login_required
+def nifty_stocks_page():
+    """Display NIFTY 50 stocks analysis page"""
+    from app.controllers.nifty_stocks_controller import nifty_stocks_page
+    return nifty_stocks_page()

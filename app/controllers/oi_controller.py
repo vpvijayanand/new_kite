@@ -23,6 +23,62 @@ def oi_changes():
                              error="Error loading OI changes data")
 
 
+def oi_changes_timeline_api():
+    """API endpoint for OI changes timeline data for chart"""
+    try:
+        from sqlalchemy import func
+        from datetime import datetime, timedelta
+        
+        # Get today's start time
+        today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        # Get all records from today grouped by timestamp
+        timeline_data = db.session.query(
+            OptionChainData.timestamp,
+            func.sum(OptionChainData.ce_oi_change).label('total_ce_change'),
+            func.sum(OptionChainData.pe_oi_change).label('total_pe_change')
+        ).filter(
+            OptionChainData.timestamp >= today_start,
+            OptionChainData.underlying == 'NIFTY'
+        ).group_by(OptionChainData.timestamp).order_by(OptionChainData.timestamp).all()
+        
+        # Format data for chart
+        chart_data = {
+            'labels': [],
+            'ce_changes': [],
+            'pe_changes': []
+        }
+        
+        cumulative_ce_change = 0
+        cumulative_pe_change = 0
+        
+        for record in timeline_data:
+            # Convert timestamp to IST and format for display
+            ist_time = utc_to_ist(record.timestamp)
+            time_label = ist_time.strftime('%H:%M')
+            
+            # Calculate cumulative changes
+            cumulative_ce_change += (record.total_ce_change or 0)
+            cumulative_pe_change += (record.total_pe_change or 0)
+            
+            chart_data['labels'].append(time_label)
+            chart_data['ce_changes'].append(cumulative_ce_change)
+            chart_data['pe_changes'].append(cumulative_pe_change)
+        
+        return jsonify({
+            'success': True,
+            'data': chart_data,
+            'last_updated': utc_to_ist(datetime.utcnow()).isoformat()
+        })
+        
+    except Exception as e:
+        print(f"Error in oi_changes_timeline_api: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Error loading timeline data'
+        }), 500
+
+
 def oi_changes_api():
     """API endpoint for OI changes data"""
     try:

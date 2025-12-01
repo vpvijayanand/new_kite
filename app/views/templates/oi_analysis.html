@@ -264,15 +264,19 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Load initial data
     loadOIAnalysis();
+    updateOiChangeChart();
     
     // Auto refresh every 45 seconds
-    setInterval(loadOIAnalysis, 45000);
+    setInterval(() => {
+        loadOIAnalysis();
+        updateOiChangeChart();
+    }, 45000);
     
     // Event listeners
     document.getElementById('refreshBtn').addEventListener('click', function() {
         this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Refreshing...';
         this.disabled = true;
-        loadOIAnalysis().finally(() => {
+        Promise.all([loadOIAnalysis(), updateOiChangeChart()]).finally(() => {
             this.innerHTML = '<i class="fas fa-sync me-1"></i>Refresh Data';
             this.disabled = false;
         });
@@ -432,25 +436,66 @@ document.addEventListener('DOMContentLoaded', function() {
             data: {
                 labels: [],
                 datasets: [{
-                    label: 'Call OI Change',
+                    label: 'Total CE OI Change',
                     data: [],
-                    borderColor: 'rgba(220, 53, 69, 1)',      // Red - indicates downtrend
-                    backgroundColor: 'rgba(220, 53, 69, 0.2)',
-                    tension: 0.1
+                    borderColor: 'red',                        // Red color as requested
+                    backgroundColor: 'rgba(255, 0, 0, 0.1)',
+                    borderWidth: 2,
+                    pointRadius: 3,
+                    tension: 0.1,
+                    fill: false
                 }, {
-                    label: 'Put OI Change',
+                    label: 'Total PE OI Change', 
                     data: [],
-                    borderColor: 'rgba(25, 135, 84, 1)',      // Green - indicates uptrend
-                    backgroundColor: 'rgba(25, 135, 84, 0.2)',
-                    tension: 0.1
+                    borderColor: 'green',                      // Green color as requested
+                    backgroundColor: 'rgba(0, 128, 0, 0.1)',
+                    borderWidth: 2,
+                    pointRadius: 3,
+                    tension: 0.1,
+                    fill: false
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'OI Changes Throughout the Day',
+                        font: {
+                            size: 14,
+                            weight: 'bold'
+                        }
+                    },
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    }
+                },
                 scales: {
+                    x: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Time (IST)',
+                            font: {
+                                weight: 'bold'
+                            }
+                        }
+                    },
                     y: {
-                        beginAtZero: true
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Cumulative OI Change',
+                            font: {
+                                weight: 'bold'
+                            }
+                        }
                     }
                 }
             }
@@ -468,14 +513,8 @@ document.addEventListener('DOMContentLoaded', function() {
         oiDistributionChart.data.datasets[1].data = peOIs;
         oiDistributionChart.update();
         
-        // Update OI Change Chart
-        const ceChanges = data.map(item => item.ce_data.oi_change);
-        const peChanges = data.map(item => item.pe_data.oi_change);
-        
-        oiChangeChart.data.labels = strikes;
-        oiChangeChart.data.datasets[0].data = ceChanges;
-        oiChangeChart.data.datasets[1].data = peChanges;
-        oiChangeChart.update();
+        // Update OI Change Chart with timeline data
+        updateOiChangeChart();
     }
     
     function updateSupportResistanceLevels(data, metrics) {
@@ -589,6 +628,63 @@ document.addEventListener('DOMContentLoaded', function() {
     function calculatePercentChange(current, change) {
         const previous = current - change;
         return previous !== 0 ? (change / previous) * 100 : 0;
+    }
+    
+    function updateOiChangeChart() {
+        // Load timeline data for OI Change chart
+        return fetch('/api/oi-changes-timeline')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const chartData = data.data;
+                    
+                    // Update the OI Change Chart with timeline data
+                    oiChangeChart.data.labels = chartData.labels;
+                    oiChangeChart.data.datasets[0].data = chartData.ce_changes;
+                    oiChangeChart.data.datasets[1].data = chartData.pe_changes;
+                    
+                    // Update chart title and axis labels
+                    oiChangeChart.options.scales.x = {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Time (IST)',
+                            font: {
+                                weight: 'bold'
+                            }
+                        }
+                    };
+                    
+                    oiChangeChart.options.scales.y = {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Cumulative OI Change',
+                            font: {
+                                weight: 'bold'
+                            }
+                        },
+                        ticks: {
+                            callback: function(value) {
+                                // Format large numbers with K/M suffixes
+                                if (Math.abs(value) >= 1000000) {
+                                    return (value / 1000000).toFixed(1) + 'M';
+                                } else if (Math.abs(value) >= 1000) {
+                                    return (value / 1000).toFixed(1) + 'K';
+                                }
+                                return value.toLocaleString();
+                            }
+                        }
+                    };
+                    
+                    oiChangeChart.update();
+                } else {
+                    console.error('Error loading timeline data:', data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching timeline data:', error);
+            });
     }
 });
 

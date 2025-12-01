@@ -29,7 +29,7 @@ def create_app(config_name='default'):
     app.register_blueprint(api_bp, url_prefix='/api')
     
     # Import models to ensure they're registered with SQLAlchemy
-    from app.models import nifty_price, banknifty_price, expiry_settings
+    from app.models import nifty_price, banknifty_price, expiry_settings, nifty_stocks
     
     # Create tables
     with app.app_context():

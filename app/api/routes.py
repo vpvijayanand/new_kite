@@ -1,7 +1,13 @@
 from flask import Blueprint, jsonify, request
 from app.services.market_service import MarketService
 from app.services.kite_service import KiteService
-from app.controllers.oi_controller import oi_changes_api
+from app.controllers.oi_controller import oi_changes_api, oi_changes_timeline_api
+from app.controllers.nifty_stocks_controller import (
+    nifty_stocks_api, 
+    update_nifty_stocks_api, 
+    nifty_top_performers_api, 
+    nifty_sector_performance_api
+)
 
 api_bp = Blueprint('api', __name__)
 
@@ -72,6 +78,11 @@ def get_oi_changes():
     """API endpoint to get OI changes data"""
     return oi_changes_api()
 
+@api_bp.route('/oi-changes-timeline', methods=['GET'])
+def get_oi_changes_timeline():
+    """API endpoint to get OI changes timeline data for chart"""
+    return oi_changes_timeline_api()
+
 @api_bp.route('/strikes/<underlying>', methods=['GET'])
 def get_strikes(underlying):
     """API endpoint to get available strikes for underlying"""
@@ -89,3 +100,29 @@ def get_strategy_analysis(underlying, strike_gap, protection_gap):
     """API endpoint to get strategy analysis for sell high + buy higher strategy"""
     from app.controllers.strategy_controller import analyze_strategies
     return analyze_strategies(underlying, strike_gap, protection_gap)
+
+@api_bp.route('/all-oi-analysis/<underlying>', methods=['GET'])
+def get_all_oi_analysis(underlying):
+    """API endpoint to get complete OI analysis for all strikes"""
+    from app.controllers.all_oi_controller import get_all_oi_data
+    return get_all_oi_data(underlying)
+
+@api_bp.route('/nifty-stocks', methods=['GET'])
+def get_nifty_stocks():
+    """API endpoint to get NIFTY 50 stocks data"""
+    return nifty_stocks_api()
+
+@api_bp.route('/update-nifty-stocks', methods=['POST'])
+def update_nifty_stocks():
+    """API endpoint to update all NIFTY 50 stock prices"""
+    return update_nifty_stocks_api()
+
+@api_bp.route('/nifty-top-performers', methods=['GET'])
+def get_nifty_top_performers():
+    """API endpoint to get top performing NIFTY 50 stocks"""
+    return nifty_top_performers_api()
+
+@api_bp.route('/nifty-sector-performance', methods=['GET'])
+def get_nifty_sector_performance():
+    """API endpoint to get sector performance data"""
+    return nifty_sector_performance_api()

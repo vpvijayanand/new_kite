@@ -1,0 +1,484 @@
+{% extends "base.html" %}
+
+{% block title %}All OI Analysis{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-table text-primary"></i> All OI Analysis - Complete Strike Overview</h2>
+                <div class="text-muted">
+                    <i class="fas fa-clock"></i> Last Updated: <span id="lastUpdated">{{ format_ist_time(current_time) }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Selection Controls -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card border-primary">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-filter"></i> Select Underlying Index</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label for="underlyingSelect" class="form-label">Underlying Index</label>
+                            <select class="form-select" id="underlyingSelect">
+                                <option value="">Select Underlying</option>
+                                <option value="NIFTY">NIFTY 50</option>
+                                <option value="BANKNIFTY">BANK NIFTY</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <button class="btn btn-success w-100" id="loadOiBtn" disabled>
+                                <i class="fas fa-search"></i> Load All OI Data
+                            </button>
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <button class="btn btn-info w-100" id="refreshBtn" disabled>
+                                <i class="fas fa-sync-alt"></i> Refresh Data
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div id="summarySection" class="row mb-4 d-none">
+        <div class="col-md-3">
+            <div class="card border-success">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-success">Total CE OI</h5>
+                    <h3 class="mb-0" id="totalCeOi">-</h3>
+                    <small class="text-muted">Across All Strikes</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-danger">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-danger">Total PE OI</h5>
+                    <h3 class="mb-0" id="totalPeOi">-</h3>
+                    <small class="text-muted">Across All Strikes</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-info">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-info">Current Index Price</h5>
+                    <h3 class="mb-0" id="currentIndexPrice">-</h3>
+                    <small class="text-muted" id="indexLabel">Index Value</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-warning">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-warning">PCR Ratio</h5>
+                    <h3 class="mb-0" id="pcrRatio">-</h3>
+                    <small class="text-muted">PE OI / CE OI</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div id="loadingSpinner" class="text-center d-none">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-2">Loading Complete OI Analysis...</p>
+    </div>
+
+    <!-- OI Analysis Table -->
+    <div id="oiTableSection" class="row d-none">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-dark text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-table"></i> Complete OI Analysis - All Strikes</h5>
+                        <div class="d-flex align-items-center">
+                            <div class="form-check form-switch me-3">
+                                <input class="form-check-input" type="checkbox" id="autoRefreshToggle">
+                                <label class="form-check-label text-white" for="autoRefreshToggle">
+                                    Auto-refresh (30s)
+                                </label>
+                            </div>
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle"></i> ITM strikes highlighted
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped mb-0" id="oiTable">
+                            <thead class="table-dark sticky-top">
+                                <tr>
+                                    <th class="text-center">Total CE OI</th>
+                                    <th class="text-center">CE OI Change %</th>
+                                    <th class="text-center bg-primary text-white">Strike Price</th>
+                                    <th class="text-center">PE OI Change %</th>
+                                    <th class="text-center">Total PE OI</th>
+                                </tr>
+                            </thead>
+                            <tbody id="oiTableBody">
+                                <!-- OI data will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer text-muted">
+                    <div class="row text-center">
+                        <div class="col-md-2">
+                            <small><strong>Legend:</strong></small>
+                        </div>
+                        <div class="col-md-2">
+                            <span class="badge bg-success me-1"></span>
+                            <small>High CE OI</small>
+                        </div>
+                        <div class="col-md-2">
+                            <span class="badge bg-danger me-1"></span>
+                            <small>High PE OI</small>
+                        </div>
+                        <div class="col-md-2">
+                            <span class="badge bg-warning text-dark me-1"></span>
+                            <small>ITM Strike</small>
+                        </div>
+                        <div class="col-md-2">
+                            <span class="badge bg-info me-1"></span>
+                            <small>ATM Strike</small>
+                        </div>
+                        <div class="col-md-2">
+                            <small><span id="strikeCount">0</span> Strikes</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- No Data Message -->
+    <div id="noDataSection" class="row d-none">
+        <div class="col-md-12">
+            <div class="alert alert-warning text-center">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h5>No Data Available</h5>
+                <p class="mb-0">No OI data found for the selected underlying. Please try again later.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- OI Analysis Info -->
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="alert alert-info">
+                <h6 class="mb-2"><i class="fas fa-info-circle"></i> OI Analysis Guide:</h6>
+                <div class="row">
+                    <div class="col-md-6">
+                        <strong>Call Options (CE):</strong>
+                        <ul class="mb-2">
+                            <li><span class="text-success">High CE OI:</span> Strong resistance level</li>
+                            <li><span class="text-warning">CE OI Increase:</span> Bearish sentiment</li>
+                            <li><span class="text-info">CE OI Decrease:</span> Bullish breakout possible</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Put Options (PE):</strong>
+                        <ul class="mb-2">
+                            <li><span class="text-danger">High PE OI:</span> Strong support level</li>
+                            <li><span class="text-warning">PE OI Increase:</span> Bullish sentiment</li>
+                            <li><span class="text-info">PE OI Decrease:</span> Bearish breakdown possible</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-12">
+                        <strong>PCR Ratio Interpretation:</strong>
+                        <span class="ms-2">
+                            <span class="badge bg-success">PCR > 1.2</span> Oversold (Bullish) |
+                            <span class="badge bg-warning text-dark">0.8 < PCR < 1.2</span> Neutral |
+                            <span class="badge bg-danger">PCR < 0.8</span> Overbought (Bearish)
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const underlyingSelect = document.getElementById('underlyingSelect');
+    const loadOiBtn = document.getElementById('loadOiBtn');
+    const refreshBtn = document.getElementById('refreshBtn');
+    const autoRefreshToggle = document.getElementById('autoRefreshToggle');
+    
+    // Auto-refresh variables
+    let autoRefreshInterval = null;
+    let currentUnderlying = null;
+    let currentIndexPrice = 0;
+    
+    // Enable buttons when underlying is selected
+    underlyingSelect.addEventListener('change', function() {
+        const isSelected = this.value !== '';
+        loadOiBtn.disabled = !isSelected;
+        refreshBtn.disabled = !isSelected;
+        
+        if (!isSelected) {
+            stopAutoRefresh();
+        }
+    });
+    
+    // Load OI data
+    loadOiBtn.addEventListener('click', function() {
+        const underlying = underlyingSelect.value;
+        if (underlying) {
+            currentUnderlying = underlying;
+            loadAllOiData(underlying);
+        }
+    });
+    
+    // Refresh data
+    refreshBtn.addEventListener('click', function() {
+        if (currentUnderlying) {
+            loadAllOiData(currentUnderlying, true);
+        }
+    });
+    
+    // Auto-refresh toggle
+    autoRefreshToggle.addEventListener('change', function() {
+        if (this.checked && currentUnderlying) {
+            startAutoRefresh();
+        } else {
+            stopAutoRefresh();
+        }
+    });
+    
+    function loadAllOiData(underlying, isRefresh = false) {
+        // Show loading spinner
+        if (!isRefresh) {
+            document.getElementById('loadingSpinner').classList.remove('d-none');
+            document.getElementById('summarySection').classList.add('d-none');
+            document.getElementById('oiTableSection').classList.add('d-none');
+            document.getElementById('noDataSection').classList.add('d-none');
+        }
+        
+        // Fetch complete OI analysis
+        fetch(`/api/all-oi-analysis/${underlying}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (!isRefresh) {
+                    document.getElementById('loadingSpinner').classList.add('d-none');
+                }
+                
+                if (data.success) {
+                    displayOiData(data, isRefresh);
+                } else {
+                    showNoDataMessage(data.message || 'Failed to load OI data');
+                }
+            })
+            .catch(error => {
+                if (!isRefresh) {
+                    document.getElementById('loadingSpinner').classList.add('d-none');
+                    showNoDataMessage('Error loading data: ' + error.message);
+                }
+                console.error('Error:', error);
+            });
+    }
+    
+    function displayOiData(data, isRefresh = false) {
+        // Update summary cards
+        document.getElementById('totalCeOi').textContent = formatNumber(data.summary.total_ce_oi);
+        document.getElementById('totalPeOi').textContent = formatNumber(data.summary.total_pe_oi);
+        document.getElementById('currentIndexPrice').textContent = '₹' + formatNumber(data.summary.current_index_price);
+        document.getElementById('indexLabel').textContent = data.underlying + ' Value';
+        document.getElementById('pcrRatio').textContent = data.summary.pcr_ratio;
+        
+        // Color code PCR ratio
+        const pcrElement = document.getElementById('pcrRatio');
+        const pcr = parseFloat(data.summary.pcr_ratio);
+        if (pcr > 1.2) {
+            pcrElement.className = 'mb-0 text-success fw-bold';
+        } else if (pcr < 0.8) {
+            pcrElement.className = 'mb-0 text-danger fw-bold';
+        } else {
+            pcrElement.className = 'mb-0 text-warning fw-bold';
+        }
+        
+        // Store current index price for ITM calculation
+        currentIndexPrice = data.summary.current_index_price;
+        
+        // Populate OI table
+        populateOiTable(data.strikes, data.underlying);
+        
+        // Update strike count
+        document.getElementById('strikeCount').textContent = data.strikes.length;
+        
+        // Show sections
+        if (!isRefresh) {
+            document.getElementById('summarySection').classList.remove('d-none');
+            document.getElementById('oiTableSection').classList.remove('d-none');
+        }
+        
+        // Update last updated time
+        document.getElementById('lastUpdated').textContent = new Date().toLocaleString('en-IN', {
+            timeZone: 'Asia/Kolkata',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+    }
+    
+    function populateOiTable(strikes, underlying) {
+        const tbody = document.getElementById('oiTableBody');
+        tbody.innerHTML = '';
+        
+        // Find max OI values for color scaling
+        const maxCeOi = Math.max(...strikes.map(s => s.ce_oi || 0));
+        const maxPeOi = Math.max(...strikes.map(s => s.pe_oi || 0));
+        
+        strikes.forEach(strike => {
+            const row = createOiRow(strike, maxCeOi, maxPeOi, underlying);
+            tbody.appendChild(row);
+        });
+    }
+    
+    function createOiRow(strike, maxCeOi, maxPeOi, underlying) {
+        const row = document.createElement('tr');
+        
+        // Determine if strike is ITM, ATM, or OTM
+        const strikePrice = strike.strike_price;
+        const isAtm = Math.abs(currentIndexPrice - strikePrice) <= 50; // Within 50 points
+        const isCeItm = strikePrice < currentIndexPrice; // CE is ITM when strike < current
+        const isPeItm = strikePrice > currentIndexPrice; // PE is ITM when strike > current
+        
+        // Calculate color intensity based on OI values
+        const ceIntensity = maxCeOi > 0 ? (strike.ce_oi || 0) / maxCeOi : 0;
+        const peIntensity = maxPeOi > 0 ? (strike.pe_oi || 0) / maxPeOi : 0;
+        
+        // CE OI cell styling
+        let ceOiClass = 'text-center';
+        if (ceIntensity > 0.7) ceOiClass += ' bg-success bg-opacity-25 fw-bold';
+        else if (ceIntensity > 0.4) ceOiClass += ' bg-success bg-opacity-10';
+        
+        // PE OI cell styling
+        let peOiClass = 'text-center';
+        if (peIntensity > 0.7) peOiClass += ' bg-danger bg-opacity-25 fw-bold';
+        else if (peIntensity > 0.4) peOiClass += ' bg-danger bg-opacity-10';
+        
+        // Strike price cell styling
+        let strikeClass = 'text-center fw-bold';
+        if (isAtm) {
+            strikeClass += ' bg-info bg-opacity-50 text-white';
+        } else if (isCeItm || isPeItm) {
+            strikeClass += ' bg-warning bg-opacity-25';
+        }
+        
+        // OI Change styling
+        const ceChangeClass = getChangeClass(strike.ce_oi_change_percent);
+        const peChangeClass = getChangeClass(strike.pe_oi_change_percent);
+        
+        row.innerHTML = `
+            <td class="${ceOiClass}">
+                ${formatNumber(strike.ce_oi || 0)}
+                ${isCeItm ? '<small class="text-warning d-block">ITM</small>' : ''}
+            </td>
+            <td class="text-center ${ceChangeClass}">
+                ${formatChangePercent(strike.ce_oi_change_percent)}
+            </td>
+            <td class="${strikeClass}">
+                ${formatNumber(strikePrice)}
+                ${isAtm ? '<small class="d-block">ATM</small>' : ''}
+            </td>
+            <td class="text-center ${peChangeClass}">
+                ${formatChangePercent(strike.pe_oi_change_percent)}
+            </td>
+            <td class="${peOiClass}">
+                ${formatNumber(strike.pe_oi || 0)}
+                ${isPeItm ? '<small class="text-warning d-block">ITM</small>' : ''}
+            </td>
+        `;
+        
+        // Add hover effect
+        row.addEventListener('mouseenter', function() {
+            this.style.backgroundColor = '#f8f9fa';
+        });
+        
+        row.addEventListener('mouseleave', function() {
+            this.style.backgroundColor = '';
+        });
+        
+        return row;
+    }
+    
+    function getChangeClass(changePercent) {
+        if (!changePercent) return '';
+        
+        const change = parseFloat(changePercent);
+        if (change > 10) return 'text-success fw-bold';
+        else if (change > 5) return 'text-success';
+        else if (change < -10) return 'text-danger fw-bold';
+        else if (change < -5) return 'text-danger';
+        else return 'text-muted';
+    }
+    
+    function formatChangePercent(percent) {
+        if (!percent || percent === 0) return '-';
+        
+        const value = parseFloat(percent);
+        const sign = value > 0 ? '+' : '';
+        return `${sign}${value.toFixed(1)}%`;
+    }
+    
+    function startAutoRefresh() {
+        if (autoRefreshInterval) return; // Already running
+        
+        autoRefreshInterval = setInterval(() => {
+            if (currentUnderlying) {
+                loadAllOiData(currentUnderlying, true);
+            }
+        }, 30000); // 30 seconds
+    }
+    
+    function stopAutoRefresh() {
+        if (autoRefreshInterval) {
+            clearInterval(autoRefreshInterval);
+            autoRefreshInterval = null;
+        }
+        autoRefreshToggle.checked = false;
+    }
+    
+    function showNoDataMessage(message) {
+        document.getElementById('noDataSection').classList.remove('d-none');
+        if (message) {
+            document.querySelector('#noDataSection p').textContent = message;
+        }
+    }
+    
+    function formatNumber(num) {
+        if (!num) return '-';
+        return new Intl.NumberFormat('en-IN').format(num);
+    }
+    
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', function() {
+        stopAutoRefresh();
+    });
+});
+</script>
+{% endblock %}

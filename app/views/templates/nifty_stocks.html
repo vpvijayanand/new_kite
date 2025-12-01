@@ -1,0 +1,477 @@
+{% extends "base.html" %}
+
+{% block title %}NIFTY 50 Stocks Analysis{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <!-- Header Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h2 class="card-title mb-0">
+                        <i class="fas fa-chart-line me-2"></i>NIFTY 50 Stocks Analysis
+                    </h2>
+                    <p class="card-text mb-0">Real-time individual stock tracking and NIFTY influence analysis</p>
+                    <small id="lastUpdated" class="text-light">Last Updated: Loading...</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title text-success">Gainers</h5>
+                    <h3 id="gainersCount" class="text-success">-</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title text-danger">Losers</h5>
+                    <h3 id="losersCount" class="text-danger">-</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title text-warning">Unchanged</h5>
+                    <h3 id="unchangedCount" class="text-warning">-</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">Net NIFTY Influence</h5>
+                    <h3 id="netInfluence" class="fw-bold">-</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Controls Row -->
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <div class="btn-group" role="group">
+                <button type="button" class="btn btn-primary" onclick="refreshStocksData()">
+                    <i class="fas fa-refresh me-1"></i>Refresh Data
+                </button>
+                <button type="button" class="btn btn-success" onclick="updateAllPrices()">
+                    <i class="fas fa-download me-1"></i>Update Prices
+                </button>
+            </div>
+        </div>
+        <div class="col-md-6 text-end">
+            <div class="form-check form-switch d-inline-block me-3">
+                <input class="form-check-input" type="checkbox" id="autoRefresh" checked>
+                <label class="form-check-label" for="autoRefresh">Auto Refresh (30s)</label>
+            </div>
+            <select class="form-select d-inline-block w-auto" id="sectorFilter">
+                <option value="">All Sectors</option>
+                <option value="IT">Information Technology</option>
+                <option value="Banking">Banking</option>
+                <option value="Finance">Financial Services</option>
+                <option value="Oil & Gas">Oil & Gas</option>
+                <option value="Consumer">Consumer Goods</option>
+                <option value="Pharma">Pharmaceuticals</option>
+                <option value="Auto">Automobile</option>
+                <option value="Telecom">Telecommunications</option>
+                <option value="Power">Power</option>
+                <option value="Metals">Metals & Mining</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- NIFTY 50 Stocks Table -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">NIFTY 50 Stocks Details</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover" id="niftyStocksTable">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Symbol</th>
+                                    <th>Company Name</th>
+                                    <th>Sector</th>
+                                    <th>NIFTY Weight (%)</th>
+                                    <th>9:20 AM Price</th>
+                                    <th>Current Price</th>
+                                    <th>Change</th>
+                                    <th>Change %</th>
+                                    <th>NIFTY Influence</th>
+                                    <th>Last Updated</th>
+                                </tr>
+                            </thead>
+                            <tbody id="stocksTableBody">
+                                <tr>
+                                    <td colspan="10" class="text-center">Loading NIFTY 50 stocks data...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Performers Section -->
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h6 class="mb-0">Top 5 Gainers</h6>
+                </div>
+                <div class="card-body">
+                    <div id="topGainers">Loading...</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h6 class="mb-0">Top 5 Losers</h6>
+                </div>
+                <div class="card-body">
+                    <div id="topLosers">Loading...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sector Performance -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Sector Performance</h6>
+                </div>
+                <div class="card-body">
+                    <div id="sectorPerformance">Loading sector performance...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.positive {
+    color: #28a745 !important;
+}
+.negative {
+    color: #dc3545 !important;
+}
+.neutral {
+    color: #6c757d !important;
+}
+.high-influence {
+    font-weight: bold;
+}
+.table td {
+    vertical-align: middle;
+}
+.performer-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #eee;
+}
+.performer-item:last-child {
+    border-bottom: none;
+}
+.sector-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+.sector-item:last-child {
+    border-bottom: none;
+}
+</style>
+
+<script>
+let autoRefreshInterval;
+
+// Initialize page
+document.addEventListener('DOMContentLoaded', function() {
+    refreshStocksData();
+    loadTopPerformers();
+    loadSectorPerformance();
+    
+    // Setup auto-refresh
+    setupAutoRefresh();
+    
+    // Setup sector filter
+    document.getElementById('sectorFilter').addEventListener('change', function() {
+        filterTableBySector(this.value);
+    });
+});
+
+function setupAutoRefresh() {
+    const autoRefreshCheckbox = document.getElementById('autoRefresh');
+    
+    function startAutoRefresh() {
+        if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+        autoRefreshInterval = setInterval(function() {
+            if (autoRefreshCheckbox.checked) {
+                refreshStocksData();
+            }
+        }, 30000); // 30 seconds
+    }
+    
+    startAutoRefresh();
+    autoRefreshCheckbox.addEventListener('change', function() {
+        if (this.checked) {
+            startAutoRefresh();
+        } else {
+            clearInterval(autoRefreshInterval);
+        }
+    });
+}
+
+function refreshStocksData() {
+    fetch('/api/nifty-stocks')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateStocksTable(data.stocks);
+                updateSummaryCards(data.summary);
+                document.getElementById('lastUpdated').textContent = 
+                    'Last Updated: ' + new Date(data.last_updated).toLocaleTimeString();
+            } else {
+                console.error('Error loading stocks:', data.error);
+                showError('Error loading NIFTY 50 stocks data');
+            }
+        })
+        .catch(error => {
+            console.error('Fetch error:', error);
+            showError('Network error loading stocks data');
+        });
+}
+
+function updateStocksTable(stocks) {
+    const tbody = document.getElementById('stocksTableBody');
+    
+    if (!stocks || stocks.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center">No stocks data available</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = stocks.map(stock => {
+        const changeClass = stock.change_percent > 0 ? 'positive' : 
+                           stock.change_percent < 0 ? 'negative' : 'neutral';
+        const influenceClass = Math.abs(stock.nifty_influence) > 5 ? 'high-influence' : '';
+        
+        return `
+            <tr data-sector="${stock.sector}">
+                <td class="fw-bold">${stock.symbol}</td>
+                <td>${stock.company_name}</td>
+                <td><span class="badge bg-secondary">${stock.sector}</span></td>
+                <td>${stock.nifty_weightage.toFixed(2)}%</td>
+                <td>₹${stock.price_9_20_am ? stock.price_9_20_am.toFixed(2) : 'N/A'}</td>
+                <td>₹${stock.current_price ? stock.current_price.toFixed(2) : 'N/A'}</td>
+                <td class="${changeClass}">
+                    ${stock.price_change ? (stock.price_change > 0 ? '+' : '') + stock.price_change.toFixed(2) : '0.00'}
+                </td>
+                <td class="${changeClass}">
+                    ${stock.change_percent ? (stock.change_percent > 0 ? '+' : '') + stock.change_percent.toFixed(2) + '%' : '0.00%'}
+                </td>
+                <td class="${changeClass} ${influenceClass}">
+                    ${stock.nifty_influence ? (stock.nifty_influence > 0 ? '+' : '') + stock.nifty_influence.toFixed(2) : '0.00'}
+                </td>
+                <td>${stock.last_updated ? new Date(stock.last_updated).toLocaleTimeString() : 'N/A'}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function updateSummaryCards(summary) {
+    document.getElementById('gainersCount').textContent = summary.gainers || 0;
+    document.getElementById('losersCount').textContent = summary.losers || 0;
+    document.getElementById('unchangedCount').textContent = summary.unchanged || 0;
+    
+    const netInfluence = summary.net_nifty_influence || 0;
+    const netInfluenceEl = document.getElementById('netInfluence');
+    netInfluenceEl.textContent = (netInfluence > 0 ? '+' : '') + netInfluence.toFixed(2);
+    netInfluenceEl.className = 'fw-bold ' + (netInfluence > 0 ? 'positive' : netInfluence < 0 ? 'negative' : 'neutral');
+}
+
+function updateAllPrices() {
+    const button = event.target;
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Updating...';
+    button.disabled = true;
+    
+    fetch('/api/update-nifty-stocks', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showSuccess(`Updated ${data.updated_count} stocks successfully`);
+                refreshStocksData();
+                loadTopPerformers();
+                loadSectorPerformance();
+            } else {
+                showError('Error updating stocks: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Update error:', error);
+            showError('Network error updating stocks');
+        })
+        .finally(() => {
+            button.innerHTML = originalText;
+            button.disabled = false;
+        });
+}
+
+function loadTopPerformers() {
+    fetch('/api/nifty-top-performers')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateTopPerformers(data.data);
+            }
+        })
+        .catch(error => console.error('Error loading top performers:', error));
+}
+
+function updateTopPerformers(data) {
+    const gainersEl = document.getElementById('topGainers');
+    const losersEl = document.getElementById('topLosers');
+    
+    gainersEl.innerHTML = data.top_gainers.map(stock => `
+        <div class="performer-item">
+            <div>
+                <strong>${stock.symbol}</strong><br>
+                <small class="text-muted">${stock.company_name}</small>
+            </div>
+            <div class="text-end">
+                <span class="positive fw-bold">+${stock.change_percent.toFixed(2)}%</span><br>
+                <small class="text-muted">₹${stock.current_price.toFixed(2)}</small>
+            </div>
+        </div>
+    `).join('');
+    
+    losersEl.innerHTML = data.top_losers.map(stock => `
+        <div class="performer-item">
+            <div>
+                <strong>${stock.symbol}</strong><br>
+                <small class="text-muted">${stock.company_name}</small>
+            </div>
+            <div class="text-end">
+                <span class="negative fw-bold">${stock.change_percent.toFixed(2)}%</span><br>
+                <small class="text-muted">₹${stock.current_price.toFixed(2)}</small>
+            </div>
+        </div>
+    `).join('');
+}
+
+function loadSectorPerformance() {
+    fetch('/api/nifty-sector-performance')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateSectorPerformance(data.sectors);
+            } else {
+                console.error('Sector performance API error:', data.error);
+                document.getElementById('sectorPerformance').innerHTML = 
+                    '<div class="alert alert-warning">Unable to load sector performance data</div>';
+            }
+        })
+        .catch(error => {
+            console.error('Error loading sector performance:', error);
+            document.getElementById('sectorPerformance').innerHTML = 
+                '<div class="alert alert-danger">Network error loading sector performance</div>';
+        });
+}
+
+function updateSectorPerformance(sectors) {
+    const sectorEl = document.getElementById('sectorPerformance');
+    
+    if (!sectors || sectors.length === 0) {
+        sectorEl.innerHTML = '<div class="alert alert-info">No sector performance data available. Stock data may need to be updated.</div>';
+        return;
+    }
+    
+    sectorEl.innerHTML = sectors.map(sector => {
+        const changeClass = sector.avg_change > 0 ? 'positive' : 
+                           sector.avg_change < 0 ? 'negative' : 'neutral';
+        
+        return `
+            <div class="sector-item">
+                <div>
+                    <strong>${sector.sector}</strong>
+                    <small class="text-muted ms-2">(${sector.stock_count} stocks)</small>
+                </div>
+                <div class="text-end">
+                    <span class="${changeClass} fw-bold">
+                        ${sector.avg_change > 0 ? '+' : ''}${sector.avg_change.toFixed(2)}%
+                    </span><br>
+                    <small class="text-muted">Influence: ${sector.total_influence.toFixed(2)}</small>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function filterTableBySector(sector) {
+    const rows = document.querySelectorAll('#stocksTableBody tr');
+    
+    rows.forEach(row => {
+        if (!sector || row.getAttribute('data-sector') === sector) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
+function showSuccess(message) {
+    // Create a simple success notification
+    const alert = document.createElement('div');
+    alert.className = 'alert alert-success alert-dismissible fade show position-fixed';
+    alert.style.top = '20px';
+    alert.style.right = '20px';
+    alert.style.zIndex = '9999';
+    alert.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(alert);
+    
+    setTimeout(() => {
+        alert.remove();
+    }, 3000);
+}
+
+function showError(message) {
+    // Create a simple error notification
+    const alert = document.createElement('div');
+    alert.className = 'alert alert-danger alert-dismissible fade show position-fixed';
+    alert.style.top = '20px';
+    alert.style.right = '20px';
+    alert.style.zIndex = '9999';
+    alert.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(alert);
+    
+    setTimeout(() => {
+        alert.remove();
+    }, 5000);
+}
+</script>
+{% endblock %}

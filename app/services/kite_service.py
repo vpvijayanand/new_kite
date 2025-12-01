@@ -402,3 +402,59 @@ class KiteService:
     
     def logout(self):
         self.token_manager.delete_token()
+    
+    def get_stock_price(self, symbol):
+        """Get current stock price for a given symbol"""
+        try:
+            # Load access token
+            access_token = self.token_manager.load_token()
+            if not access_token:
+                print(f"No access token available for fetching {symbol} price")
+                return None
+            
+            self.kite.set_access_token(access_token)
+            
+            # Get instrument token for the symbol (this is a simplified approach)
+            # In production, you'd need to map symbols to instrument tokens
+            
+            # For now, we'll use a demo/mock approach for stock prices
+            # since getting individual stock prices requires instrument tokens
+            return self._get_demo_stock_price(symbol)
+            
+        except Exception as e:
+            print(f"Error fetching stock price for {symbol}: {e}")
+            return None
+    
+    def _get_demo_stock_price(self, symbol):
+        """Generate demo stock price data for development"""
+        import random
+        
+        # Base prices for major NIFTY 50 stocks (approximate current levels)
+        base_prices = {
+            'RELIANCE': 3000, 'HDFCBANK': 1700, 'ICICIBANK': 1200, 'INFY': 1800, 'TCS': 4200,
+            'BHARTIARTL': 1500, 'ITC': 450, 'LT': 3800, 'KOTAKBANK': 1800, 'HINDUNILVR': 2400,
+            'SBIN': 850, 'BAJFINANCE': 7000, 'HCLTECH': 1800, 'MARUTI': 11000, 'M&M': 3000,
+            'ASIANPAINT': 2500, 'SUNPHARMA': 1800, 'TATAMOTORS': 1000, 'ULTRACEMCO': 11500,
+            'AXISBANK': 1200, 'JSWSTEEL': 900, 'POWERGRID': 350, 'NTPC': 400, 'TECHM': 1700,
+            'ADANIPORTS': 1500, 'COALINDIA': 450, 'ONGC': 280, 'HINDALCO': 650, 'BAJAJFINSV': 1600,
+            'BAJAJ-AUTO': 9000, 'NESTLEIND': 2200, 'CIPLA': 1700, 'DRREDDY': 1300, 'TITAN': 3400,
+            'TRENT': 6500, 'SBILIFE': 1600, 'TATASTEEL': 150, 'WIPRO': 550, 'GRASIM': 2600,
+            'ADANIENT': 3200, 'TATACONSUM': 900, 'JIOFIN': 350, 'INDIGO': 4500, 'APOLLOHOSP': 7000,
+            'BEL': 300, 'EICHERMOT': 4800, 'SHIRAMFIN': 3200, 'TMPV': 800, 'MAXHEALTH': 1000
+        }
+        
+        base_price = base_prices.get(symbol, 1000)  # Default to 1000 if symbol not found
+        
+        # Add some random variation (-3% to +3%)
+        variation = random.uniform(-0.03, 0.03)
+        current_price = base_price * (1 + variation)
+        
+        # Generate volume (random between 10K to 10M)
+        volume = random.randint(10000, 10000000)
+        
+        return {
+            'last_price': round(current_price, 2),
+            'volume': volume,
+            'change': round(base_price * variation, 2),
+            'change_percent': round(variation * 100, 2)
+        }
