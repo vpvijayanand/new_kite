@@ -21,15 +21,17 @@ def create_app(config_name='default'):
     from app.controllers.auth_controller import auth_bp
     from app.controllers.market_controller import market_bp, init_scheduler
     from app.controllers.admin_controller import admin_bp
+    from app.controllers.strategy_controller import strategy_bp
     from app.api.routes import api_bp
     
     app.register_blueprint(auth_bp)
     app.register_blueprint(market_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(strategy_bp)
     app.register_blueprint(api_bp, url_prefix='/api')
     
     # Import models to ensure they're registered with SQLAlchemy
-    from app.models import nifty_price, banknifty_price, expiry_settings, nifty_stocks
+    from app.models import nifty_price, banknifty_price, expiry_settings, nifty_stocks, strategy_models
     
     # Create tables
     with app.app_context():

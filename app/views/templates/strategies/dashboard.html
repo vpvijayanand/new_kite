@@ -1,0 +1,307 @@
+{% extends "base.html" %}
+
+{% block title %}Trading Strategies{% endblock %}
+
+{% block extra_css %}
+<style>
+.strategy-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+}
+
+.strategy-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 45px rgba(0,0,0,0.2);
+}
+
+.strategy-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    color: #fff;
+}
+
+.strategy-title {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #fff;
+    margin-bottom: 0.5rem;
+}
+
+.strategy-description {
+    color: rgba(255,255,255,0.9);
+    margin-bottom: 1.5rem;
+}
+
+.strategy-stats {
+    background: rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+}
+
+.stat-label {
+    color: #ffffff;
+    font-weight: 500;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+}
+
+.stat-value {
+    color: #ffffff;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+}
+
+.dashboard-header {
+    background: linear-gradient(135deg, #ff6b6b 0%, #feca57 100%);
+    color: white;
+    padding: 2rem;
+    border-radius: 15px;
+    margin-bottom: 2rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="dashboard-header text-center">
+        <h1 class="display-4 mb-3">
+            <i class="fas fa-chess-king me-3"></i>Trading Strategies
+        </h1>
+        <p class="lead mb-0">Automated trading strategies for systematic market participation</p>
+        <small class="d-block mt-2">
+            <i class="fas fa-clock me-1"></i>Market Hours: 9:30 AM - 3:15 PM IST
+        </small>
+    </div>
+
+    <!-- Strategies Grid -->
+    <div class="row">
+        <!-- Strategy 1 -->
+        <div class="col-lg-4 col-md-6 mb-4">
+            <div class="card strategy-card h-100 text-white">
+                <div class="card-body text-center">
+                    <div class="strategy-icon">
+                        <i class="fas fa-chart-line-up"></i>
+                    </div>
+                    <h3 class="strategy-title">Strategy 1</h3>
+                    <p class="strategy-description">
+                        NIFTY High-Low Breakout Strategy<br>
+                        <small>9:12-9:33 Range | Credit Spreads</small>
+                    </p>
+                    
+                    <div class="strategy-stats">
+                        <div class="stat-item">
+                            <span class="stat-label">Status:</span>
+                            <span class="stat-value" id="strategy1Status">
+                                <i class="fas fa-spinner fa-spin"></i> Loading...
+                            </span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Today P&L:</span>
+                            <span class="stat-value" id="strategy1PnL">₹0.00</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Capital:</span>
+                            <span class="stat-value" id="strategy1Capital">₹0.00</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Return %:</span>
+                            <span class="stat-value" id="strategy1Return">0.00%</span>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('strategy.strategy_1') }}" class="btn btn-light btn-lg">
+                            <i class="fas fa-eye me-2"></i>View Strategy
+                        </a>
+                        <button class="btn btn-outline-light" onclick="refreshStrategy1()">
+                            <i class="fas fa-sync-alt me-2"></i>Refresh
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Strategy 2 (Coming Soon) -->
+        <div class="col-lg-4 col-md-6 mb-4">
+            <div class="card strategy-card h-100 text-white" style="opacity: 0.6;">
+                <div class="card-body text-center">
+                    <div class="strategy-icon">
+                        <i class="fas fa-cogs"></i>
+                    </div>
+                    <h3 class="strategy-title">Strategy 2</h3>
+                    <p class="strategy-description">
+                        Coming Soon<br>
+                        <small>Advanced Options Strategies</small>
+                    </p>
+                    
+                    <div class="strategy-stats">
+                        <div class="stat-item">
+                            <span class="stat-label">Status:</span>
+                            <span class="stat-value">Development</span>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button class="btn btn-secondary" disabled>
+                            <i class="fas fa-lock me-2"></i>Coming Soon
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Strategy 3 (Coming Soon) -->
+        <div class="col-lg-4 col-md-6 mb-4">
+            <div class="card strategy-card h-100 text-white" style="opacity: 0.6;">
+                <div class="card-body text-center">
+                    <div class="strategy-icon">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <h3 class="strategy-title">Strategy 3</h3>
+                    <p class="strategy-description">
+                        Coming Soon<br>
+                        <small>AI-Driven Trading</small>
+                    </p>
+                    
+                    <div class="strategy-stats">
+                        <div class="stat-item">
+                            <span class="stat-label">Status:</span>
+                            <span class="stat-value">Planning</span>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button class="btn btn-secondary" disabled>
+                            <i class="fas fa-lock me-2"></i>Coming Soon
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overall Performance Summary -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card bg-dark text-white">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-pie me-2"></i>Overall Strategy Performance
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-3">
+                            <h3 class="text-success" id="totalPnL">₹0.00</h3>
+                            <small class="text-muted">Total P&L Today</small>
+                        </div>
+                        <div class="col-md-3">
+                            <h3 class="text-info" id="totalCapital">₹0.00</h3>
+                            <small class="text-muted">Total Capital Deployed</small>
+                        </div>
+                        <div class="col-md-3">
+                            <h3 class="text-warning" id="activeStrategies">1</h3>
+                            <small class="text-muted">Active Strategies</small>
+                        </div>
+                        <div class="col-md-3">
+                            <h3 class="text-primary" id="overallReturn">0.00%</h3>
+                            <small class="text-muted">Overall Return %</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Refresh Strategy 1 data
+async function refreshStrategy1() {
+    try {
+        const response = await fetch('/strategies/api/strategy-1/status');
+        const data = await response.json();
+        
+        if (data.error) {
+            document.getElementById('strategy1Status').innerHTML = '<span class="text-danger">Error</span>';
+            return;
+        }
+        
+        // Update status
+        let statusText = 'Monitoring';
+        let statusClass = 'text-warning';
+        
+        if (data.positions && data.positions.triggered) {
+            if (data.positions.trade_status === 'CLOSED') {
+                statusText = 'Trade Closed';
+                statusClass = 'text-secondary';
+            } else {
+                statusText = data.positions.trigger_type === 'LOW_BREAK' ? 'Bear Spread Active' : 'Bull Spread Active';
+                statusClass = 'text-success';
+            }
+        } else if (!data.is_market_hours) {
+            statusText = 'Market Closed';
+            statusClass = 'text-secondary';
+        } else if (!data.is_trading_time) {
+            statusText = 'No New Trades';
+            statusClass = 'text-info';
+        } else if (data.today_trade_count >= 2) {
+            statusText = 'Daily Limit Reached';
+            statusClass = 'text-info';
+        }
+        
+        document.getElementById('strategy1Status').innerHTML = `<span class="${statusClass}">${statusText}</span>`;
+        
+        // Update P&L
+        const pnl = data.positions?.current_pnl || 0;
+        const pnlClass = pnl >= 0 ? 'text-success' : 'text-danger';
+        document.getElementById('strategy1PnL').innerHTML = `<span class="${pnlClass}">₹${pnl.toFixed(2)}</span>`;
+        
+        // Update Capital
+        const capital = data.positions?.capital_used || 0;
+        document.getElementById('strategy1Capital').textContent = `₹${capital.toFixed(0)}`;
+        
+        // Update Return %
+        const returnPct = data.pnl_percentage || 0;
+        const returnClass = returnPct >= 0 ? 'text-success' : 'text-danger';
+        document.getElementById('strategy1Return').innerHTML = `<span class="${returnClass}">${returnPct.toFixed(2)}%</span>`;
+        
+        // Update overall summary
+        updateOverallSummary(pnl, capital, returnPct);
+        
+    } catch (error) {
+        console.error('Error refreshing Strategy 1:', error);
+        document.getElementById('strategy1Status').innerHTML = '<span class="text-danger">Error</span>';
+    }
+}
+
+function updateOverallSummary(pnl, capital, returnPct) {
+    // For now, just Strategy 1 data
+    const pnlClass = pnl >= 0 ? 'text-success' : 'text-danger';
+    const returnClass = returnPct >= 0 ? 'text-success' : 'text-danger';
+    
+    document.getElementById('totalPnL').innerHTML = `<span class="${pnlClass}">₹${pnl.toFixed(2)}</span>`;
+    document.getElementById('totalCapital').textContent = `₹${capital.toFixed(0)}`;
+    document.getElementById('overallReturn').innerHTML = `<span class="${returnClass}">${returnPct.toFixed(2)}%</span>`;
+}
+
+// Initialize and auto-refresh
+document.addEventListener('DOMContentLoaded', function() {
+    refreshStrategy1();
+    
+    // Auto-refresh every 30 seconds
+    setInterval(refreshStrategy1, 30000);
+});
+</script>
+{% endblock %}

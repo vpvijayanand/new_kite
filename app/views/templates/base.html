@@ -67,6 +67,26 @@
                             </a></li>
                         </ul>
                     </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="strategiesDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-chess-king me-1"></i>Trading Strategies
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="strategiesDropdown">
+                            <li><a class="dropdown-item" href="{{ url_for('strategy.strategies_dashboard') }}">
+                                <i class="fas fa-tachometer-alt me-1"></i>Strategies Dashboard
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('strategy.strategy_1') }}">
+                                <i class="fas fa-chart-line-up me-1"></i>Strategy 1 - Breakout
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" style="opacity: 0.6;" onclick="return false;">
+                                <i class="fas fa-lock me-1"></i>Strategy 2 - Coming Soon
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" style="opacity: 0.6;" onclick="return false;">
+                                <i class="fas fa-lock me-1"></i>Strategy 3 - Coming Soon
+                            </a></li>
+                        </ul>
+                    </li>
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('market.nifty_prices') }}">
                             <i class="fas fa-list me-1"></i>Price History

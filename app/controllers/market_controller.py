@@ -48,6 +48,34 @@ def fetch_price_job():
     except Exception as e:
         print(f"Error in scheduled job: {str(e)}")
 
+def strategy_1_monitor_job():
+    """Background job to monitor Strategy 1 every minute during market hours"""
+    try:
+        # Import here to avoid circular imports
+        from app.services.strategy_service import StrategyService
+        
+        app = getattr(strategy_1_monitor_job, 'app', None)
+        if app:
+            with app.app_context():
+                strategy_service = StrategyService()
+                
+                # Only run during market hours (9:30 AM - 3:15 PM IST)
+                if strategy_service.is_market_hours():
+                    # Execute strategy logic
+                    result = strategy_service.execute_strategy_1()
+                    if result.get('success'):
+                        print(f"Strategy 1 monitoring completed at {datetime.now()}")
+                    else:
+                        print(f"Strategy 1 monitoring error: {result.get('message', 'Unknown error')}")
+                else:
+                    print(f"Strategy 1 monitoring skipped - outside market hours at {datetime.now()}")
+        else:
+            print("Strategy 1 monitoring failed - no app context")
+    except ImportError as ie:
+        print(f"Strategy service not available: {str(ie)}")
+    except Exception as e:
+        print(f"Error in Strategy 1 monitoring job: {str(e)}")
+
 # Initialize scheduler after app context is available
 def init_scheduler(app):
     """Initialize the background scheduler"""
@@ -59,10 +87,28 @@ def init_scheduler(app):
             id='fetch_nifty_price',
             replace_existing=True
         )
+        
+        # Add Strategy 1 monitoring job (every minute during market hours)
+        try:
+            scheduler.add_job(
+                func=strategy_1_monitor_job,
+                trigger="interval",
+                minutes=1,
+                id='strategy_1_monitor',
+                replace_existing=True
+            )
+            print("Strategy 1 monitoring job added successfully")
+        except Exception as e:
+            print(f"Failed to add Strategy 1 monitoring job: {str(e)}")
+        
         scheduler.start()
         
         # Store reference to app for context
         fetch_price_job.app = app
+        try:
+            strategy_1_monitor_job.app = app
+        except:
+            pass  # Ignore if strategy job function is not available
 
 @market_bp.route('/')
 def index():

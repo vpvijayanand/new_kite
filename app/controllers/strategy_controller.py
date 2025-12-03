@@ -1,3 +1,69 @@
+from flask import Blueprint, render_template, jsonify, current_app, request
+from app.services.strategy_service import StrategyService
+from app.middlewares.auth_middleware import login_required
+from datetime import datetime, time
+import traceback
+
+# Create Blueprint for strategy routes
+strategy_bp = Blueprint('strategy', __name__, url_prefix='/strategies')
+
+@strategy_bp.route('/')
+@login_required
+def strategies_dashboard():
+    """Main strategies dashboard"""
+    return render_template('strategies/dashboard.html')
+
+@strategy_bp.route('/strategy-1')
+@login_required
+def strategy_1():
+    """Strategy 1 - Nifty High Low Breakout Strategy"""
+    try:
+        strategy_service = StrategyService()
+        
+        # Get today's strategy data
+        strategy_data = strategy_service.get_strategy_1_data()
+        
+        return render_template('strategies/strategy_1.html', **strategy_data)
+    except Exception as e:
+        current_app.logger.error(f"Error in strategy_1: {str(e)}")
+        return render_template('strategies/strategy_1.html', error=str(e))
+
+@strategy_bp.route('/api/strategy-1/status')
+@login_required
+def strategy_1_status():
+    """API endpoint for Strategy 1 current status"""
+    try:
+        strategy_service = StrategyService()
+        status_data = strategy_service.get_strategy_1_status()
+        return jsonify(status_data)
+    except Exception as e:
+        current_app.logger.error(f"Error in strategy_1_status: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@strategy_bp.route('/api/strategy-1/history')
+@login_required
+def strategy_1_history():
+    """API endpoint for Strategy 1 minute-by-minute data"""
+    try:
+        strategy_service = StrategyService()
+        history_data = strategy_service.get_strategy_1_history()
+        return jsonify(history_data)
+    except Exception as e:
+        current_app.logger.error(f"Error in strategy_1_history: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@strategy_bp.route('/api/strategy-1/execute')
+@login_required
+def execute_strategy_1():
+    """Manual trigger for Strategy 1 execution (for testing)"""
+    try:
+        strategy_service = StrategyService()
+        result = strategy_service.execute_strategy_1()
+        return jsonify(result)
+    except Exception as e:
+        current_app.logger.error(f"Error in execute_strategy_1: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 from flask import jsonify
 from datetime import datetime, date, timedelta
 import pytz
