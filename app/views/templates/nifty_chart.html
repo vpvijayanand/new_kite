@@ -1,0 +1,663 @@
+{% extends "base.html" %}
+
+{% block title %}NIFTY Index Chart - 30min MACD Analysis{% endblock %}
+
+{% block extra_css %}
+<style>
+.chart-header {
+    background: linear-gradient(135deg, var(--kite-accent) 0%, #1F4E79 100%);
+    color: var(--kite-text-main);
+    padding: 2rem;
+    border-radius: 15px;
+    margin-bottom: 2rem;
+    border: 1px solid var(--kite-border);
+}
+
+.chart-controls {
+    background: var(--kite-card-bg);
+    border: 1px solid var(--kite-border);
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.signal-card {
+    background: linear-gradient(135deg, var(--kite-secondary) 0%, #0AA1DD 100%);
+    border: 1px solid var(--kite-border);
+    border-radius: 10px;
+    color: var(--kite-text-main);
+}
+
+.buy-signal {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+}
+
+.sell-signal {
+    background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);
+    color: white;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+}
+
+.neutral-signal {
+    background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+    color: white;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+}
+
+.macd-values {
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+}
+
+#tradingview_chart {
+    height: 600px;
+    border-radius: 10px;
+    border: 1px solid var(--kite-border);
+}
+
+.signal-history {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.signal-item {
+    border-left: 4px solid transparent;
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+    border-radius: 0 8px 8px 0;
+}
+
+.signal-item.buy {
+    border-left-color: #28a745;
+    background: rgba(40, 167, 69, 0.1);
+}
+
+.signal-item.sell {
+    border-left-color: #dc3545;
+    background: rgba(220, 53, 69, 0.1);
+}
+
+.price-change-positive {
+    color: #28a745;
+    font-weight: bold;
+}
+
+.price-change-negative {
+    color: #dc3545;
+    font-weight: bold;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Chart Header -->
+    <div class="chart-header text-center">
+        <div class="d-flex justify-content-between align-items-center">
+            <a href="{{ url_for('market.dashboard') }}" class="btn btn-outline-primary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+            </a>
+            <div>
+                <h1 class="display-5 mb-2">
+                    <i class="fas fa-chart-candlestick me-3"></i>NIFTY Index Chart
+                </h1>
+                <p class="lead mb-0">30-Minute Timeframe with MACD Analysis</p>
+                <small>Real-time Buy/Sell Signals • MACD(12,26,9) • Auto-refresh every 30 minutes</small>
+            </div>
+            <div>
+                <button class="btn btn-outline-success me-2" onclick="refreshChart()" id="refreshBtn">
+                    <i class="fas fa-sync-alt me-2"></i>Refresh Chart
+                </button>
+                <button class="btn btn-outline-info" onclick="showMACDInfo()" id="infoBtn">
+                    <i class="fas fa-info-circle me-2"></i>MACD Info
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Current Status Row -->
+    <div class="row mb-4">
+        <!-- Current Price -->
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card signal-card text-white h-100">
+                <div class="card-body text-center">
+                    <h5 class="card-title">
+                        <i class="fas fa-chart-line me-2"></i>NIFTY Current
+                    </h5>
+                    <h2 id="currentPrice">---.--</h2>
+                    <small id="priceChange" class="price-change-neutral">-- (---%)</small>
+                    <br><small id="lastUpdate">Last updated: --:--</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- MACD Signal -->
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card h-100" id="macdSignalCard">
+                <div class="card-body text-center">
+                    <h5 class="card-title">
+                        <i class="fas fa-chart-bar me-2"></i>MACD Signal
+                    </h5>
+                    <h2 id="macdSignal">NEUTRAL</h2>
+                    <small id="signalStrength">Strength: --</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- MACD Values -->
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card signal-card text-white h-100">
+                <div class="card-body">
+                    <h5 class="card-title text-center">
+                        <i class="fas fa-calculator me-2"></i>MACD Values
+                    </h5>
+                    <div class="macd-values">
+                        <div class="d-flex justify-content-between">
+                            <span>MACD Line:</span>
+                            <span id="macdLine">--</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>Signal Line:</span>
+                            <span id="signalLine">--</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>Histogram:</span>
+                            <span id="histogram">--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Signal Stats -->
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card signal-card text-white h-100">
+                <div class="card-body text-center">
+                    <h5 class="card-title">
+                        <i class="fas fa-chart-pie me-2"></i>Today's Signals
+                    </h5>
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <h4 id="buySignalsCount" class="text-success">0</h4>
+                            <small>Buy Signals</small>
+                        </div>
+                        <div class="col-6">
+                            <h4 id="sellSignalsCount" class="text-danger">0</h4>
+                            <small>Sell Signals</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart Container -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card bg-dark text-white">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-candlestick me-2"></i>NIFTY 30-Minute Chart with MACD
+                    </h5>
+                    <div class="chart-controls d-flex align-items-center">
+                        <div class="form-check form-switch me-3">
+                            <input class="form-check-input" type="checkbox" id="autoRefresh" checked>
+                            <label class="form-check-label text-white" for="autoRefresh">Auto Refresh</label>
+                        </div>
+                        <select class="form-select form-select-sm me-2" id="symbolSelect" onchange="changeSymbol()">
+                            <option value="NSE:NIFTY50">NIFTY 50 Index</option>
+                            <option value="NSE:NIFTY">NIFTY Basic</option>
+                            <option value="NSE:NIFTY1!">NIFTY Futures</option>
+                            <option value="TVC:NIFTY">TVC NIFTY</option>
+                            <option value="INDEX:NIFTY">INDEX NIFTY</option>
+                        </select>
+                        <select class="form-select form-select-sm me-2" id="timeframeSelect" onchange="changeTimeframe()">
+                            <option value="30">30 Minutes</option>
+                            <option value="15">15 Minutes</option>
+                            <option value="60">1 Hour</option>
+                            <option value="D">Daily</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div id="tradingview_chart"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Signal History and Analysis -->
+    <div class="row">
+        <div class="col-lg-8 mb-3">
+            <div class="card bg-dark text-white">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-history me-2"></i>Recent MACD Signals
+                    </h5>
+                </div>
+                <div class="card-body signal-history" id="signalHistory">
+                    <div class="text-center text-muted py-4">
+                        <i class="fas fa-spinner fa-spin me-2"></i>Loading signal history...
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4 mb-3">
+            <div class="card bg-dark text-white">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-info-circle me-2"></i>MACD Strategy Info
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <h6 class="text-success">📈 Buy Signal:</h6>
+                        <small>
+                            • MACD line crosses above Signal line<br>
+                            • Histogram turns positive<br>
+                            • Momentum is increasing
+                        </small>
+                    </div>
+                    <div class="mb-3">
+                        <h6 class="text-danger">📉 Sell Signal:</h6>
+                        <small>
+                            • MACD line crosses below Signal line<br>
+                            • Histogram turns negative<br>
+                            • Momentum is decreasing
+                        </small>
+                    </div>
+                    <div class="mb-3">
+                        <h6 class="text-info">⚙️ Parameters:</h6>
+                        <small>
+                            • Fast EMA: 12 periods<br>
+                            • Slow EMA: 26 periods<br>
+                            • Signal EMA: 9 periods<br>
+                            • Timeframe: 30 minutes
+                        </small>
+                    </div>
+                    <div class="alert alert-warning">
+                        <small>
+                            <strong>Note:</strong> MACD is a trend-following momentum indicator. 
+                            Use in conjunction with other analysis for best results.
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- TradingView Charting Library -->
+<script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+
+<script>
+let chart;
+let refreshInterval;
+
+// Initialize TradingView Chart
+function initChart(symbolOverride = null) {
+    // Try different NIFTY symbol formats
+    const niftySymbols = [
+        "NSE:NIFTY50",     // NIFTY 50 Index
+        "NSE:NIFTY",       // Basic NIFTY
+        "NSE:NIFTY1!",     // NIFTY Futures
+        "TVC:NIFTY",       // TradingView NIFTY
+        "INDEX:NIFTY"      // Index format
+    ];
+    
+    const selectedSymbol = symbolOverride || niftySymbols[0];
+    
+    chart = new TradingView.widget({
+        "width": "100%",
+        "height": 600,
+        "symbol": selectedSymbol,
+        "interval": "30",
+        "timezone": "Asia/Kolkata",
+        "theme": "dark",
+        "style": "1",
+        "locale": "en",
+        "toolbar_bg": "#f1f3f6",
+        "enable_publishing": false,
+        "allow_symbol_change": true,  // Allow users to change symbol if needed
+        "container_id": "tradingview_chart",
+        "studies": [
+            "MACD@tv-basicstudies"
+        ],
+        "overrides": {
+            "mainSeriesProperties.candleStyle.upColor": "#26a69a",
+            "mainSeriesProperties.candleStyle.downColor": "#ef5350",
+            "mainSeriesProperties.candleStyle.borderUpColor": "#26a69a",
+            "mainSeriesProperties.candleStyle.borderDownColor": "#ef5350",
+            "mainSeriesProperties.candleStyle.wickUpColor": "#26a69a",
+            "mainSeriesProperties.candleStyle.wickDownColor": "#ef5350"
+        },
+        "onChartReady": function() {
+            console.log('Chart loaded with symbol:', selectedSymbol);
+        }
+    });
+}
+
+// Refresh chart
+function refreshChart() {
+    const refreshBtn = document.getElementById('refreshBtn');
+    refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Refreshing...';
+    
+    // Refresh current price data
+    refreshCurrentData();
+    
+    // Refresh MACD signals
+    refreshMACDSignals();
+    
+    setTimeout(() => {
+        refreshBtn.innerHTML = '<i class="fas fa-sync-alt me-2"></i>Refresh Chart';
+    }, 2000);
+}
+
+// Refresh current price and MACD data
+async function refreshCurrentData() {
+    try {
+        // Get current NIFTY price
+        const response = await fetch('/market/api/current-nifty');
+        const data = await response.json();
+        
+        if (data.price) {
+            document.getElementById('currentPrice').textContent = data.price.toFixed(2);
+            
+            // Calculate price change
+            const change = data.change || 0;
+            const changePercent = data.change_percent || 0;
+            const changeElement = document.getElementById('priceChange');
+            
+            if (change >= 0) {
+                changeElement.textContent = `+${change.toFixed(2)} (+${changePercent.toFixed(2)}%)`;
+                changeElement.className = 'price-change-positive';
+            } else {
+                changeElement.textContent = `${change.toFixed(2)} (${changePercent.toFixed(2)}%)`;
+                changeElement.className = 'price-change-negative';
+            }
+            
+            // Update last update time
+            const now = new Date();
+            document.getElementById('lastUpdate').textContent = `Last updated: ${now.toLocaleTimeString('en-IN', {timeZone: 'Asia/Kolkata'})}`;
+        }
+        
+        // Get real MACD data from backend
+        await refreshMACDData();
+        
+    } catch (error) {
+        console.error('Error refreshing current data:', error);
+    }
+}
+
+// Get real MACD data from backend
+async function refreshMACDData() {
+    try {
+        const timeframe = document.getElementById('timeframeSelect').value;
+        
+        // Get MACD analysis
+        const macdResponse = await fetch(`/market/api/macd-analysis?timeframe=${timeframe}`);
+        const macdData = await macdResponse.json();
+        
+        if (macdData.success) {
+            const macd = macdData.macd_data;
+            
+            // Update MACD values
+            document.getElementById('macdLine').textContent = macd.macd_line.toFixed(2);
+            document.getElementById('signalLine').textContent = macd.signal_line.toFixed(2);
+            document.getElementById('histogram').textContent = macd.histogram.toFixed(2);
+            
+            // Determine signal and styling
+            let signal, signalClass;
+            const signalCard = document.getElementById('macdSignalCard');
+            
+            switch(macd.signal) {
+                case 'BUY':
+                    signal = 'BUY';
+                    signalClass = 'buy-signal';
+                    break;
+                case 'SELL':
+                    signal = 'SELL';
+                    signalClass = 'sell-signal';
+                    break;
+                case 'BULLISH':
+                    signal = 'BULLISH';
+                    signalClass = 'buy-signal';
+                    break;
+                case 'BEARISH':
+                    signal = 'BEARISH';
+                    signalClass = 'sell-signal';
+                    break;
+                default:
+                    signal = 'NEUTRAL';
+                    signalClass = 'neutral-signal';
+            }
+            
+            document.getElementById('macdSignal').textContent = signal;
+            document.getElementById('signalStrength').textContent = `Strength: ${macd.strength || 'Unknown'}`;
+            signalCard.className = `card h-100 ${signalClass}`;
+            
+            // Update signal history
+            updateSignalHistory(macdData.signal_history || []);
+        }
+        
+        // Get signal statistics
+        const statsResponse = await fetch('/market/api/signal-stats');
+        const statsData = await statsResponse.json();
+        
+        if (statsData.success) {
+            document.getElementById('buySignalsCount').textContent = statsData.stats.buy_signals_today;
+            document.getElementById('sellSignalsCount').textContent = statsData.stats.sell_signals_today;
+        }
+        
+    } catch (error) {
+        console.error('Error refreshing MACD data:', error);
+        // Fallback to neutral state
+        document.getElementById('macdSignal').textContent = 'ERROR';
+        document.getElementById('signalStrength').textContent = 'Data unavailable';
+        document.getElementById('macdSignalCard').className = 'card h-100 neutral-signal';
+    }
+}
+
+// Update signal history display
+function updateSignalHistory(signals) {
+    const signalHistory = document.getElementById('signalHistory');
+    
+    if (!signals || signals.length === 0) {
+        signalHistory.innerHTML = `
+            <div class="text-center text-muted py-4">
+                <i class="fas fa-info-circle me-2"></i>No recent MACD signals available
+            </div>
+        `;
+        return;
+    }
+    
+    let html = '';
+    signals.forEach(signal => {
+        const iconClass = signal.type === 'buy' ? 'fa-arrow-up text-success' : 'fa-arrow-down text-danger';
+        html += `
+            <div class="signal-item ${signal.type}">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="fas ${iconClass} me-2"></i>
+                        <strong>${signal.type.toUpperCase()}</strong> Signal
+                        <small class="text-muted">(${signal.strength})</small>
+                    </div>
+                    <div class="text-end">
+                        <div><strong>₹${signal.price}</strong></div>
+                        <small class="text-muted">${signal.timestamp}</small>
+                    </div>
+                </div>
+                <small class="text-muted">
+                    MACD: ${signal.macd_value}, Signal: ${signal.signal_value}, 
+                    Histogram: ${signal.histogram}
+                </small>
+            </div>
+        `;
+    });
+    
+    signalHistory.innerHTML = html;
+}
+
+// Refresh MACD signals (now calls the backend)
+async function refreshMACDSignals() {
+    try {
+        await refreshMACDData();
+    } catch (error) {
+        console.error('Error refreshing MACD signals:', error);
+        const signalHistory = document.getElementById('signalHistory');
+        signalHistory.innerHTML = `
+            <div class="text-center text-muted py-4">
+                <i class="fas fa-exclamation-triangle me-2"></i>Error loading signal data
+            </div>
+        `;
+    }
+}
+
+// Change timeframe
+function changeTimeframe() {
+    const timeframe = document.getElementById('timeframeSelect').value;
+    
+    // Recreate chart with new timeframe
+    if (chart) {
+        chart.remove();
+    }
+    
+    // Use the same symbol selection logic
+    const niftySymbols = [
+        "NSE:NIFTY50",     // NIFTY 50 Index
+        "NSE:NIFTY",       // Basic NIFTY
+        "NSE:NIFTY1!",     // NIFTY Futures
+        "TVC:NIFTY",       // TradingView NIFTY
+        "INDEX:NIFTY"      // Index format
+    ];
+    
+    chart = new TradingView.widget({
+        "width": "100%",
+        "height": 600,
+        "symbol": niftySymbols[0],
+        "interval": timeframe,
+        "timezone": "Asia/Kolkata",
+        "theme": "dark",
+        "style": "1",
+        "locale": "en",
+        "toolbar_bg": "#f1f3f6",
+        "enable_publishing": false,
+        "allow_symbol_change": true,
+        "container_id": "tradingview_chart",
+        "studies": [
+            "MACD@tv-basicstudies"
+        ],
+        "overrides": {
+            "mainSeriesProperties.candleStyle.upColor": "#26a69a",
+            "mainSeriesProperties.candleStyle.downColor": "#ef5350",
+            "mainSeriesProperties.candleStyle.borderUpColor": "#26a69a",
+            "mainSeriesProperties.candleStyle.borderDownColor": "#ef5350",
+            "mainSeriesProperties.candleStyle.wickUpColor": "#26a69a",
+            "mainSeriesProperties.candleStyle.wickDownColor": "#ef5350"
+        }
+    });
+}
+
+// Change symbol
+function changeSymbol() {
+    const symbol = document.getElementById('symbolSelect').value;
+    const timeframe = document.getElementById('timeframeSelect').value;
+    
+    // Recreate chart with new symbol
+    if (chart) {
+        chart.remove();
+    }
+    
+    chart = new TradingView.widget({
+        "width": "100%",
+        "height": 600,
+        "symbol": symbol,
+        "interval": timeframe,
+        "timezone": "Asia/Kolkata",
+        "theme": "dark",
+        "style": "1",
+        "locale": "en",
+        "toolbar_bg": "#f1f3f6",
+        "enable_publishing": false,
+        "allow_symbol_change": true,
+        "container_id": "tradingview_chart",
+        "studies": [
+            "MACD@tv-basicstudies"
+        ],
+        "overrides": {
+            "mainSeriesProperties.candleStyle.upColor": "#26a69a",
+            "mainSeriesProperties.candleStyle.downColor": "#ef5350",
+            "mainSeriesProperties.candleStyle.borderUpColor": "#26a69a",
+            "mainSeriesProperties.candleStyle.borderDownColor": "#ef5350",
+            "mainSeriesProperties.candleStyle.wickUpColor": "#26a69a",
+            "mainSeriesProperties.candleStyle.wickDownColor": "#ef5350"
+        },
+        "onChartReady": function() {
+            console.log('Chart loaded with symbol:', symbol);
+        }
+    });
+}
+
+// Show MACD info modal
+function showMACDInfo() {
+    alert(`MACD (Moving Average Convergence Divergence) Information:
+
+📊 How it works:
+- MACD Line = 12-period EMA - 26-period EMA
+- Signal Line = 9-period EMA of MACD Line
+- Histogram = MACD Line - Signal Line
+
+📈 Buy Signals:
+- MACD line crosses above Signal line (Bullish crossover)
+- Histogram turns positive
+- MACD moves from negative to positive territory
+
+📉 Sell Signals:
+- MACD line crosses below Signal line (Bearish crossover)
+- Histogram turns negative
+- MACD moves from positive to negative territory
+
+⚠️ Best Practices:
+- Use with other indicators for confirmation
+- Works best in trending markets
+- Can give false signals in sideways markets
+- Consider overall market sentiment`);
+}
+
+// Initialize page
+document.addEventListener('DOMContentLoaded', async function() {
+    // Initialize chart
+    initChart();
+    
+    // Initial data load
+    await refreshCurrentData();
+    await refreshMACDSignals();
+    
+    // Set up auto-refresh
+    refreshInterval = setInterval(() => {
+        if (document.getElementById('autoRefresh').checked) {
+            refreshCurrentData();
+            refreshMACDSignals();
+        }
+    }, 30000); // Refresh every 30 seconds
+});
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', function() {
+    if (refreshInterval) {
+        clearInterval(refreshInterval);
+    }
+    if (chart) {
+        chart.remove();
+    }
+});
+</script>
+{% endblock %}

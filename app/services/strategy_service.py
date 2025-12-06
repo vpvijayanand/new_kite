@@ -3,7 +3,7 @@ import pytz
 from app import db
 from app.models.nifty_price import NiftyPrice
 from app.models.banknifty_price import OptionChainData
-from app.models.strategy_models import Strategy1Execution
+from app.models.strategy_models import Strategy1Execution, Strategy1Entry, Strategy1LTPHistory
 from sqlalchemy import text, func, and_, or_, desc
 import math
 import logging
@@ -31,40 +31,109 @@ class StrategyService:
         return round(value / 50) * 50
     
     def get_nifty_high_low_range(self, start_time=None, end_time=None):
-        """Get NIFTY high and low for specified time range"""
+        """Get NIFTY high and low for specific time range (default: 9:12-9:33 AM IST)"""
         try:
             today = date.today()
             
-            if not start_time:
+            # Set default time range for Strategy 1 (IST)
+            if start_time is None:
                 start_time = time(9, 12)
-            if not end_time:
+            if end_time is None:
                 end_time = time(9, 33)
-                
-            start_datetime = datetime.combine(today, start_time)
-            end_datetime = datetime.combine(today, end_time)
             
-            # Query for NIFTY prices in the specified range
-            prices = db.session.query(
-                func.max(NiftyPrice.high).label('high'),
-                func.min(NiftyPrice.low).label('low'),
-                func.avg(NiftyPrice.price).label('avg_price')
-            ).filter(
-                and_(
-                    NiftyPrice.timestamp >= start_datetime,
-                    NiftyPrice.timestamp <= end_datetime,
-                    func.date(NiftyPrice.timestamp) == today
-                )
-            ).first()
+            # TEMPORARY FIX: The database stores times with timezone offset issue
+            # 9:12 IST is stored as 3:42, 9:33 IST is stored as 4:03
+            # So we need to query for the offset times
+            offset_start_hour = start_time.hour - 5
+            offset_start_minute = start_time.minute - 30
+            offset_end_hour = end_time.hour - 5
+            offset_end_minute = end_time.minute - 30
+            
+            # Handle negative minutes
+            if offset_start_minute < 0:
+                offset_start_minute += 60
+                offset_start_hour -= 1
+            if offset_end_minute < 0:
+                offset_end_minute += 60
+                offset_end_hour -= 1
+                
+            offset_start_time = time(offset_start_hour, offset_start_minute)
+            offset_end_time = time(offset_end_hour, offset_end_minute)
+            
+            # Query records and filter manually for more precise control
+            all_records = db.session.query(NiftyPrice).filter(
+                func.date(NiftyPrice.timestamp) == today
+            ).all()
+            
+            # Filter records within the offset time range
+            range_records = []
+            for record in all_records:
+                record_time = record.timestamp.time()
+                # Check if time is between offset_start_time and offset_end_time
+                if offset_start_time <= record_time <= offset_end_time:
+                    range_records.append(record)
+            
+            if range_records:
+                # Calculate high, low, avg from filtered records
+                highs = [r.high or r.price for r in range_records if r.high or r.price]
+                lows = [r.low or r.price for r in range_records if r.low or r.price]
+                prices_list = [r.price for r in range_records if r.price]
+                
+                if highs and lows and prices_list:
+                    class MockResult:
+                        def __init__(self, high, low, avg_price):
+                            self.high = high
+                            self.low = low
+                            self.avg_price = avg_price
+                    
+                    prices = MockResult(
+                        high=max(highs),
+                        low=min(lows),
+                        avg_price=sum(prices_list) / len(prices_list)
+                    )
+                else:
+                    prices = None
+            else:
+                prices = None
             
             if prices and prices.high and prices.low:
-                return {
+                # Find specific 9:12 and 9:33 prices
+                price_912 = None
+                price_933 = None
+                
+                # Look for records closest to 9:12 and 9:33 (stored as 3:42 and 4:03)
+                target_912 = time(3, 42)  # 9:12 IST stored as 3:42
+                target_933 = time(4, 3)   # 9:33 IST stored as 4:03
+                
+                for record in range_records:
+                    record_time = record.timestamp.time()
+                    
+                    # Find 9:12 price (closest to 3:42)
+                    if abs((record_time.hour * 60 + record_time.minute) - (target_912.hour * 60 + target_912.minute)) <= 2:
+                        if price_912 is None or abs((record_time.hour * 60 + record_time.minute) - (target_912.hour * 60 + target_912.minute)) < abs((price_912['time'].hour * 60 + price_912['time'].minute) - (target_912.hour * 60 + target_912.minute)):
+                            price_912 = {'price': record.price, 'time': record_time}
+                    
+                    # Find 9:33 price (closest to 4:03)  
+                    if abs((record_time.hour * 60 + record_time.minute) - (target_933.hour * 60 + target_933.minute)) <= 2:
+                        if price_933 is None or abs((record_time.hour * 60 + record_time.minute) - (target_933.hour * 60 + target_933.minute)) < abs((price_933['time'].hour * 60 + price_933['time'].minute) - (target_933.hour * 60 + target_933.minute)):
+                            price_933 = {'price': record.price, 'time': record_time}
+                
+                result = {
                     'high': float(prices.high),
                     'low': float(prices.low),
                     'avg_price': float(prices.avg_price) if prices.avg_price else 0,
                     'range': float(prices.high) - float(prices.low),
-                    'start_time': start_time,
-                    'end_time': end_time
+                    'start_time': (start_time or time(9, 12)).strftime('%H:%M'),
+                    'end_time': (end_time or time(9, 33)).strftime('%H:%M')
                 }
+                
+                # Add specific 9:12 and 9:33 prices if found
+                if price_912:
+                    result['price_912'] = float(price_912['price'])
+                if price_933:
+                    result['price_933'] = float(price_933['price'])
+                
+                return result
             else:
                 return None
                 
@@ -80,10 +149,15 @@ class StrategyService:
             ).order_by(NiftyPrice.timestamp.desc()).first()
             
             if latest_price:
+                # Handle None values gracefully
+                price = latest_price.price or 0
+                high = latest_price.high or price
+                low = latest_price.low or price
+                
                 return {
-                    'price': float(latest_price.price),
-                    'high': float(latest_price.high),
-                    'low': float(latest_price.low),
+                    'price': float(price),
+                    'high': float(high),
+                    'low': float(low),
                     'timestamp': latest_price.timestamp
                 }
             return None
@@ -98,7 +172,7 @@ class StrategyService:
             option_data = db.session.query(OptionChainData).filter(
                 and_(
                     OptionChainData.underlying == 'NIFTY',
-                    OptionChainData.strike == strike,
+                    OptionChainData.strike_price == strike,
                     func.date(OptionChainData.timestamp) == date.today()
                 )
             ).order_by(OptionChainData.timestamp.desc()).first()
@@ -165,12 +239,22 @@ class StrategyService:
                 # Capital used (margin requirement - approximate)
                 positions['capital_used'] = (buy_strike - sell_strike) * total_quantity
                 
-                # Current P&L
+                # Current P&L - CORRECTED CALCULATION
+                # For SELL: Entry LTP - Current LTP = Profit (if price drops)
+                # For BUY: Current LTP - Entry LTP = Loss (if price increases)
                 current_sell_ltp = self.get_option_ltp(sell_strike, 'CE')['ltp']
                 current_buy_ltp = self.get_option_ltp(buy_strike, 'CE')['ltp']
                 
-                current_net_premium = current_sell_ltp - current_buy_ltp
-                positions['current_pnl'] = (positions['net_premium'] - current_net_premium) * total_quantity
+                sell_pnl = (positions['sell_ltp'] - current_sell_ltp) * total_quantity  # Profit if option price drops
+                buy_pnl = (current_buy_ltp - positions['buy_ltp']) * total_quantity   # Loss if option price increases
+                positions['current_pnl'] = sell_pnl + buy_pnl
+                positions['sell_pnl'] = sell_pnl
+                positions['buy_pnl'] = buy_pnl
+                positions['sell_ltp_entry'] = positions['sell_ltp']
+                positions['buy_ltp_entry'] = positions['buy_ltp']
+                positions['net_premium_entry'] = positions['net_premium']
+                positions['total_quantity'] = total_quantity
+                positions['option_type'] = 'CE'
                 
             # Check if NIFTY crossed above high (bullish breakout)
             elif current_price > high:
@@ -198,12 +282,22 @@ class StrategyService:
                 # Capital used
                 positions['capital_used'] = (sell_strike - buy_strike) * total_quantity
                 
-                # Current P&L
+                # Current P&L - CORRECTED CALCULATION
+                # For SELL: Entry LTP - Current LTP = Profit (if price drops)
+                # For BUY: Current LTP - Entry LTP = Loss (if price increases)
                 current_sell_ltp = self.get_option_ltp(sell_strike, 'PE')['ltp']
                 current_buy_ltp = self.get_option_ltp(buy_strike, 'PE')['ltp']
                 
-                current_net_premium = current_sell_ltp - current_buy_ltp
-                positions['current_pnl'] = (positions['net_premium'] - current_net_premium) * total_quantity
+                sell_pnl = (positions['sell_ltp'] - current_sell_ltp) * total_quantity  # Profit if option price drops
+                buy_pnl = (current_buy_ltp - positions['buy_ltp']) * total_quantity   # Loss if option price increases
+                positions['current_pnl'] = sell_pnl + buy_pnl
+                positions['sell_pnl'] = sell_pnl
+                positions['buy_pnl'] = buy_pnl
+                positions['sell_ltp_entry'] = positions['sell_ltp']
+                positions['buy_ltp_entry'] = positions['buy_ltp']
+                positions['net_premium_entry'] = positions['net_premium']
+                positions['total_quantity'] = total_quantity
+                positions['option_type'] = 'PE'
                 
             return positions
             
@@ -229,21 +323,54 @@ class StrategyService:
             pnl_percentage = 0
             
             if active_trade:
-                # Use actual trade data
+                # Get current LTPs for live prices
+                option_type = 'CE' if active_trade.option_type == 'CE' else 'PE'
+                sell_ltp_data = self.get_option_ltp(active_trade.sell_strike, option_type)
+                buy_ltp_data = self.get_option_ltp(active_trade.buy_strike, option_type)
+                
+                current_sell_ltp = sell_ltp_data['ltp']
+                current_buy_ltp = buy_ltp_data['ltp']
+                current_net_premium = current_sell_ltp - current_buy_ltp
+                
+                # Calculate current P&L - CORRECTED CALCULATION
+                entry_sell_ltp = active_trade.sell_ltp_entry or 0
+                entry_buy_ltp = active_trade.buy_ltp_entry or 0
+                total_quantity = active_trade.total_quantity or (active_trade.lots * active_trade.quantity_per_lot)
+                
+                sell_pnl = (entry_sell_ltp - current_sell_ltp) * total_quantity  # Profit if sell option price drops
+                buy_pnl = (current_buy_ltp - entry_buy_ltp) * total_quantity     # Loss if buy option price increases
+                current_pnl = sell_pnl + buy_pnl
+                
+                # Calculate individual option P&L breakdown
+                entry_sell_ltp = active_trade.sell_ltp_entry or 0
+                entry_buy_ltp = active_trade.buy_ltp_entry or 0
+                entry_net_premium = entry_sell_ltp - entry_buy_ltp
+                
+                sell_pnl = (entry_sell_ltp - current_sell_ltp) * total_quantity
+                buy_pnl = (current_buy_ltp - entry_buy_ltp) * total_quantity
+                
+                # Use actual trade data with detailed breakdown
                 positions = {
                     'triggered': True,
                     'trigger_type': active_trade.trigger_type,
                     'sell_strike': active_trade.sell_strike,
                     'buy_strike': active_trade.buy_strike,
-                    'sell_ltp': active_trade.sell_ltp_current,
-                    'buy_ltp': active_trade.buy_ltp_current,
-                    'net_premium': active_trade.net_premium_current,
+                    'sell_ltp_entry': entry_sell_ltp,
+                    'buy_ltp_entry': entry_buy_ltp,
+                    'sell_ltp': current_sell_ltp,
+                    'buy_ltp': current_buy_ltp,
+                    'net_premium_entry': entry_net_premium,
+                    'net_premium': current_net_premium,
+                    'sell_pnl': sell_pnl,
+                    'buy_pnl': buy_pnl,
                     'capital_used': active_trade.capital_used,
-                    'current_pnl': active_trade.current_pnl,
+                    'current_pnl': current_pnl,
                     'lots': active_trade.lots,
                     'quantity_per_lot': active_trade.quantity_per_lot,
+                    'total_quantity': total_quantity,
                     'trade_status': 'CLOSED' if 'CLOSED' in (active_trade.notes or '') else 'ACTIVE',
-                    'trade_id': active_trade.id
+                    'trade_id': active_trade.id,
+                    'option_type': active_trade.option_type or 'CE'
                 }
                 pnl_percentage = active_trade.pnl_percentage
             elif range_data and current_price_data:
@@ -290,7 +417,7 @@ class StrategyService:
         return self.get_strategy_1_data()
     
     def get_strategy_1_history(self):
-        """Get execution history from database for today"""
+        """Get comprehensive execution history with detailed price tracking"""
         try:
             today = date.today()
             
@@ -299,12 +426,23 @@ class StrategyService:
                 Strategy1Execution.execution_date == today
             ).order_by(Strategy1Execution.timestamp.asc()).all()
             
-            # If no executions, show theoretical data based on NIFTY price movements
+            # If no executions, show detailed theoretical data
             if not executions:
-                return self.get_theoretical_history()
+                return self.get_detailed_theoretical_history()
             
             history_data = []
             for execution in executions:
+                # Calculate individual option P&L if entry data exists
+                sell_pnl = 0
+                buy_pnl = 0
+                if execution.sell_ltp_entry and execution.buy_ltp_entry:
+                    current_sell = execution.sell_ltp_current or execution.sell_ltp_entry
+                    current_buy = execution.buy_ltp_current or execution.buy_ltp_entry
+                    total_qty = execution.total_quantity or 225
+                    
+                    sell_pnl = (execution.sell_ltp_entry - current_sell) * total_qty
+                    buy_pnl = (current_buy - execution.buy_ltp_entry) * total_qty
+                
                 history_data.append({
                     'timestamp': execution.timestamp.strftime('%H:%M') if execution.timestamp else '--:--',
                     'nifty_price': execution.current_nifty_price or 0,
@@ -312,14 +450,19 @@ class StrategyService:
                     'trigger_type': execution.trigger_type,
                     'sell_strike': execution.sell_strike,
                     'buy_strike': execution.buy_strike,
+                    'sell_ltp_entry': execution.sell_ltp_entry or 0,
+                    'buy_ltp_entry': execution.buy_ltp_entry or 0,
                     'sell_ltp': execution.sell_ltp_current or execution.sell_ltp_entry or 0,
                     'buy_ltp': execution.buy_ltp_current or execution.buy_ltp_entry or 0,
                     'net_premium': execution.net_premium_current or execution.net_premium_entry or 0,
+                    'sell_pnl': sell_pnl,
+                    'buy_pnl': buy_pnl,
                     'current_pnl': execution.current_pnl or 0,
                     'capital_used': execution.capital_used or 0,
                     'pnl_percentage': execution.pnl_percentage or 0,
                     'trade_status': 'CLOSED' if 'CLOSED' in (execution.notes or '') else 'ACTIVE',
-                    'trade_id': execution.id
+                    'trade_id': execution.id,
+                    'option_type': execution.option_type or 'CE'
                 })
             
             range_data = self.get_nifty_high_low_range()
@@ -336,8 +479,8 @@ class StrategyService:
             self.logger.error(f"Error getting Strategy 1 history: {str(e)}")
             return {'history': [], 'error': str(e)}
     
-    def get_theoretical_history(self):
-        """Get theoretical history based on NIFTY price movements (when no actual trades)"""
+    def get_detailed_theoretical_history(self):
+        """Get detailed theoretical history with comprehensive price tracking"""
         try:
             today = date.today()
             
@@ -352,6 +495,8 @@ class StrategyService:
             if not range_data:
                 return {'history': [], 'range_data': None}
             
+            entry_positions = None  # Track entry position for P&L calculation
+            
             for price_record in price_history:
                 # Calculate theoretical positions for this timestamp
                 positions = self.calculate_strategy_1_positions(
@@ -360,10 +505,30 @@ class StrategyService:
                     float(price_record.price)
                 )
                 
-                # Calculate theoretical PnL percentage
+                # Track entry positions when first triggered
+                if positions.get('triggered') and entry_positions is None:
+                    entry_positions = {
+                        'sell_ltp': positions.get('sell_ltp', 0),
+                        'buy_ltp': positions.get('buy_ltp', 0),
+                        'trigger_type': positions.get('trigger_type'),
+                        'sell_strike': positions.get('sell_strike'),
+                        'buy_strike': positions.get('buy_strike')
+                    }
+                
+                # Calculate detailed P&L with individual option breakdown
+                sell_pnl = 0
+                buy_pnl = 0
+                total_pnl = 0
                 pnl_percentage = 0
-                if positions.get('capital_used', 0) > 0:
-                    pnl_percentage = (positions.get('current_pnl', 0) / positions.get('capital_used', 1)) * 100
+                
+                if entry_positions and positions.get('triggered'):
+                    total_qty = 225  # 3 lots * 75 per lot
+                    sell_pnl = (entry_positions['sell_ltp'] - positions.get('sell_ltp', 0)) * total_qty
+                    buy_pnl = (positions.get('buy_ltp', 0) - entry_positions['buy_ltp']) * total_qty
+                    total_pnl = sell_pnl + buy_pnl
+                    
+                    if positions.get('capital_used', 0) > 0:
+                        pnl_percentage = (total_pnl / positions.get('capital_used', 1)) * 100
                 
                 history_data.append({
                     'timestamp': price_record.timestamp.strftime('%H:%M'),
@@ -372,14 +537,19 @@ class StrategyService:
                     'trigger_type': positions.get('trigger_type'),
                     'sell_strike': positions.get('sell_strike'),
                     'buy_strike': positions.get('buy_strike'),
+                    'sell_ltp_entry': entry_positions['sell_ltp'] if entry_positions else 0,
+                    'buy_ltp_entry': entry_positions['buy_ltp'] if entry_positions else 0,
                     'sell_ltp': positions.get('sell_ltp', 0),
                     'buy_ltp': positions.get('buy_ltp', 0),
                     'net_premium': positions.get('net_premium', 0),
-                    'current_pnl': positions.get('current_pnl', 0),
+                    'sell_pnl': sell_pnl,
+                    'buy_pnl': buy_pnl,
+                    'current_pnl': total_pnl,
                     'capital_used': positions.get('capital_used', 0),
                     'pnl_percentage': pnl_percentage,
                     'trade_status': 'THEORETICAL',
-                    'trade_id': None
+                    'trade_id': None,
+                    'option_type': entry_positions['trigger_type'][-2:] if entry_positions else 'CE'
                 })
             
             return {
@@ -391,7 +561,7 @@ class StrategyService:
             }
             
         except Exception as e:
-            self.logger.error(f"Error getting theoretical history: {str(e)}")
+            self.logger.error(f"Error getting detailed theoretical history: {str(e)}")
             return {'history': [], 'error': str(e)}
     
     def execute_strategy_1(self):
@@ -522,11 +692,34 @@ class StrategyService:
         """Get currently active trade if any"""
         try:
             today = date.today()
+            
+            # First check if there's an active entry in the new Strategy1Entry table
+            active_entry = db.session.query(Strategy1Entry).filter(
+                and_(
+                    Strategy1Entry.entry_date == today,
+                    Strategy1Entry.is_active == True
+                )
+            ).order_by(desc(Strategy1Entry.entry_timestamp)).first()
+            
+            if active_entry:
+                # If we have an active entry, look for the corresponding execution record
+                active_trade = db.session.query(Strategy1Execution).filter(
+                    and_(
+                        Strategy1Execution.execution_date == today,
+                        Strategy1Execution.triggered == True,
+                        Strategy1Execution.notes.contains(f'Entry_ID:{active_entry.id}')
+                    )
+                ).order_by(desc(Strategy1Execution.timestamp)).first()
+                
+                if active_trade:
+                    return active_trade
+            
+            # Fallback to legacy method
             active_trade = db.session.query(Strategy1Execution).filter(
                 and_(
                     Strategy1Execution.execution_date == today,
                     Strategy1Execution.triggered == True,
-                    Strategy1Execution.notes != 'CLOSED'  # Not closed
+                    ~Strategy1Execution.notes.contains('CLOSED')  # Not closed
                 )
             ).order_by(desc(Strategy1Execution.timestamp)).first()
             
@@ -569,9 +762,13 @@ class StrategyService:
             
             current_net_premium = current_sell_ltp - current_buy_ltp
             
-            # Calculate final P&L
-            entry_premium = active_trade.net_premium_entry or 0
-            final_pnl = (entry_premium - current_net_premium) * active_trade.total_quantity
+            # Calculate final P&L - CORRECTED CALCULATION
+            entry_sell_ltp = active_trade.sell_ltp_entry or 0
+            entry_buy_ltp = active_trade.buy_ltp_entry or 0
+            
+            sell_pnl = (entry_sell_ltp - current_sell_ltp) * active_trade.total_quantity  # Profit if sell option price drops
+            buy_pnl = (current_buy_ltp - entry_buy_ltp) * active_trade.total_quantity     # Loss if buy option price increases
+            final_pnl = sell_pnl + buy_pnl
             final_pnl_percentage = (final_pnl / active_trade.capital_used) * 100 if active_trade.capital_used > 0 else 0
             
             # Update the trade record
@@ -601,13 +798,59 @@ class StrategyService:
             return None
     
     def create_new_trade(self, positions, range_data, current_price):
-        """Create a new trade execution record"""
+        """Create a new trade execution record with proper entry tracking"""
         try:
             if not positions.get('triggered'):
                 return None
-                
+            
+            today = date.today()
+            option_type = 'CE' if positions.get('trigger_type') == 'LOW_BREAK' else 'PE'
+            
+            # Create Strategy1Entry record (main entry data)
+            new_entry = Strategy1Entry(
+                entry_date=today,
+                nifty_high_912_933=range_data.get('high'),
+                nifty_low_912_933=range_data.get('low'),
+                nifty_price_912=range_data.get('price_912'),
+                nifty_price_933=range_data.get('price_933'),
+                range_size=range_data.get('range', 0),
+                trigger_type=positions.get('trigger_type'),
+                trigger_nifty_price=current_price,
+                sell_strike=positions.get('sell_strike'),
+                buy_strike=positions.get('buy_strike'),
+                option_type=option_type,
+                sell_ltp_entry=positions.get('sell_ltp'),
+                buy_ltp_entry=positions.get('buy_ltp'),
+                net_premium_entry=positions.get('net_premium'),
+                lots=positions.get('lots', 3),
+                quantity_per_lot=positions.get('quantity_per_lot', 75),
+                total_quantity=positions.get('lots', 3) * positions.get('quantity_per_lot', 75),
+                capital_used=positions.get('capital_used')
+            )
+            
+            db.session.add(new_entry)
+            db.session.flush()  # Get the ID
+            
+            # Create initial LTP history record
+            initial_ltp_record = Strategy1LTPHistory(
+                entry_id=new_entry.id,
+                nifty_price=current_price,
+                sell_ltp=positions.get('sell_ltp'),
+                buy_ltp=positions.get('buy_ltp'),
+                net_premium=positions.get('net_premium'),
+                sell_pnl=0.0,  # Initial P&L is 0
+                buy_pnl=0.0,   # Initial P&L is 0
+                total_pnl=0.0, # Initial P&L is 0
+                pnl_percentage=0.0,
+                is_market_hours=self.is_market_hours(),
+                notes=f"ENTRY - {positions.get('trigger_type')}"
+            )
+            
+            db.session.add(initial_ltp_record)
+            
+            # Also create legacy Strategy1Execution record for compatibility
             new_trade = Strategy1Execution(
-                execution_date=date.today(),
+                execution_date=today,
                 range_high=range_data.get('high'),
                 range_low=range_data.get('low'),
                 range_captured=True,
@@ -616,27 +859,27 @@ class StrategyService:
                 trigger_type=positions.get('trigger_type'),
                 sell_strike=positions.get('sell_strike'),
                 buy_strike=positions.get('buy_strike'),
-                option_type='CE' if positions.get('trigger_type') == 'LOW_BREAK' else 'PE',
+                option_type=option_type,
                 sell_ltp_entry=positions.get('sell_ltp'),
                 buy_ltp_entry=positions.get('buy_ltp'),
                 net_premium_entry=positions.get('net_premium'),
                 sell_ltp_current=positions.get('sell_ltp'),
                 buy_ltp_current=positions.get('buy_ltp'),
                 net_premium_current=positions.get('net_premium'),
-                current_pnl=0.0,  # Initial P&L is 0
+                current_pnl=0.0,
                 capital_used=positions.get('capital_used'),
                 pnl_percentage=0.0,
                 lots=positions.get('lots', 3),
                 quantity_per_lot=positions.get('quantity_per_lot', 75),
                 total_quantity=positions.get('lots', 3) * positions.get('quantity_per_lot', 75),
                 is_market_hours=self.is_market_hours(),
-                notes=f"NEW_TRADE - {positions.get('trigger_type')}"
+                notes=f"NEW_TRADE - {positions.get('trigger_type')} - Entry_ID:{new_entry.id}"
             )
             
             db.session.add(new_trade)
             db.session.commit()
             
-            self.logger.info(f"New trade created: {positions.get('trigger_type')} at NIFTY {current_price}")
+            self.logger.info(f"New trade created: {positions.get('trigger_type')} at NIFTY {current_price}, Entry ID: {new_entry.id}")
             
             return new_trade
             
@@ -646,7 +889,7 @@ class StrategyService:
             return None
     
     def update_active_trade_pnl(self, active_trade, current_price):
-        """Update P&L for active trade"""
+        """Update P&L for active trade and add LTP history record"""
         try:
             if not active_trade:
                 return None
@@ -659,9 +902,13 @@ class StrategyService:
             
             current_net_premium = current_sell_ltp - current_buy_ltp
             
-            # Calculate current P&L
-            entry_premium = active_trade.net_premium_entry or 0
-            current_pnl = (entry_premium - current_net_premium) * active_trade.total_quantity
+            # Calculate current P&L - CORRECTED CALCULATION
+            entry_sell_ltp = active_trade.sell_ltp_entry or 0
+            entry_buy_ltp = active_trade.buy_ltp_entry or 0
+            
+            sell_pnl = (entry_sell_ltp - current_sell_ltp) * active_trade.total_quantity  # Profit if sell option price drops
+            buy_pnl = (current_buy_ltp - entry_buy_ltp) * active_trade.total_quantity     # Loss if buy option price increases
+            current_pnl = sell_pnl + buy_pnl
             current_pnl_percentage = (current_pnl / active_trade.capital_used) * 100 if active_trade.capital_used > 0 else 0
             
             # Update the trade record
@@ -673,15 +920,79 @@ class StrategyService:
             active_trade.current_nifty_price = current_price
             active_trade.timestamp = self.get_current_ist_time()
             
+            # Find and update LTP history for this trade
+            # Extract entry_id from notes if available
+            entry_id = None
+            if active_trade.notes and "Entry_ID:" in active_trade.notes:
+                try:
+                    entry_id = int(active_trade.notes.split("Entry_ID:")[1])
+                except:
+                    pass
+            
+            if entry_id:
+                # Add new LTP history record
+                ltp_record = Strategy1LTPHistory(
+                    entry_id=entry_id,
+                    nifty_price=current_price,
+                    sell_ltp=current_sell_ltp,
+                    buy_ltp=current_buy_ltp,
+                    net_premium=current_net_premium,
+                    sell_pnl=sell_pnl,
+                    buy_pnl=buy_pnl,
+                    total_pnl=current_pnl,
+                    pnl_percentage=current_pnl_percentage,
+                    is_market_hours=self.is_market_hours(),
+                    notes=f"UPDATE - {self.get_current_ist_time().strftime('%H:%M')}"
+                )
+                
+                db.session.add(ltp_record)
+            
             db.session.commit()
             
             return {
                 'current_pnl': current_pnl,
                 'current_pnl_percentage': current_pnl_percentage,
                 'current_sell_ltp': current_sell_ltp,
-                'current_buy_ltp': current_buy_ltp
+                'current_buy_ltp': current_buy_ltp,
+                'sell_pnl': sell_pnl,
+                'buy_pnl': buy_pnl,
+                'entry_id': entry_id
             }
             
         except Exception as e:
             self.logger.error(f"Error updating active trade P&L: {str(e)}")
+            return None
+    
+    def test_pnl_calculation(self):
+        """Test function to verify P&L calculation logic"""
+        try:
+            # Example scenario: Bearish breakout (LOW_BREAK)
+            # Sell CE 24000 @ 200, Buy CE 24200 @ 50
+            # Later: Sell CE now @ 190, Buy CE now @ 60
+            
+            entry_sell_ltp = 200
+            entry_buy_ltp = 50
+            current_sell_ltp = 190
+            current_buy_ltp = 60
+            total_quantity = 225
+            
+            # Correct calculation:
+            sell_pnl = (entry_sell_ltp - current_sell_ltp) * total_quantity  # (200-190)*225 = +2250
+            buy_pnl = (current_buy_ltp - entry_buy_ltp) * total_quantity     # (60-50)*225 = -2250
+            total_pnl = sell_pnl + buy_pnl  # 2250 + (-2250) = 0
+            
+            self.logger.info(f"P&L Test - Sell P&L: {sell_pnl}, Buy P&L: {buy_pnl}, Total: {total_pnl}")
+            
+            return {
+                'entry_sell': entry_sell_ltp,
+                'entry_buy': entry_buy_ltp,
+                'current_sell': current_sell_ltp,
+                'current_buy': current_buy_ltp,
+                'sell_pnl': sell_pnl,
+                'buy_pnl': buy_pnl,
+                'total_pnl': total_pnl
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error in P&L test: {str(e)}")
             return None

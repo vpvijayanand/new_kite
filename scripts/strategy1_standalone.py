@@ -38,6 +38,9 @@ def main():
     """Main execution function"""
     logger = setup_logging()
     
+    # Check for force flag
+    force_execution = '--force' in sys.argv
+    
     try:
         logger.info("Starting Strategy 1 execution")
         
@@ -48,10 +51,25 @@ def main():
             # Initialize strategy service
             strategy_service = StrategyService()
             
+            # Log current time for debugging
+            current_time = strategy_service.get_current_ist_time()
+            logger.info(f"Current IST time: {current_time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+            logger.info(f"Current day: {current_time.strftime('%A')}")
+            
             # Check if it's market hours
-            if not strategy_service.is_market_hours():
-                logger.info("Outside market hours, skipping execution")
+            is_market_hours = strategy_service.is_market_hours()
+            is_weekday = current_time.weekday() < 5
+            
+            if not is_market_hours and not force_execution:
+                if not is_weekday:
+                    logger.info("Outside market hours, skipping execution (Weekend)")
+                else:
+                    logger.info("Outside market hours, skipping execution (Market closed: 9:30 AM - 3:15 PM IST)")
+                logger.info("Use --force flag to execute outside market hours for testing")
                 return
+            
+            if force_execution and not is_market_hours:
+                logger.warning("FORCE MODE: Executing outside market hours for testing")
             
             # Execute strategy
             result = strategy_service.execute_strategy_1()

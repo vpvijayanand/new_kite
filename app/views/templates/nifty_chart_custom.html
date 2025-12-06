@@ -1,0 +1,512 @@
+{% extends "base.html" %}
+
+{% block title %}NIFTY Index Chart - Custom Python Chart{% endblock %}
+
+{% block extra_css %}
+<style>
+.chart-header {
+    background: linear-gradient(135deg, var(--kite-accent) 0%, #1F4E79 100%);
+    color: var(--kite-text-main);
+    padding: 2rem;
+    border-radius: 15px;
+    margin-bottom: 2rem;
+    border: 1px solid var(--kite-border);
+}
+
+.chart-controls {
+    background: var(--kite-card-bg);
+    border: 1px solid var(--kite-border);
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.signal-card {
+    background: linear-gradient(135deg, var(--kite-secondary) 0%, #0AA1DD 100%);
+    border: 1px solid var(--kite-border);
+    border-radius: 10px;
+    color: var(--kite-text-main);
+}
+
+.buy-signal {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+}
+
+.sell-signal {
+    background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);
+    color: white;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+}
+
+.neutral-signal {
+    background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+    color: white;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+}
+
+.macd-values {
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+}
+
+#custom_chart {
+    height: 450px;
+    border-radius: 10px;
+    border: 1px solid var(--kite-border);
+    background: #1e1e1e;
+}
+
+.price-change-positive {
+    color: #28a745;
+    font-weight: bold;
+}
+
+.price-change-negative {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+.chart-error {
+    background: #2c2c2c;
+    color: #ff6b6b;
+    padding: 3rem;
+    text-align: center;
+    border-radius: 10px;
+    border: 2px solid #ff6b6b;
+}
+
+.chart-loading {
+    background: #2c2c2c;
+    color: #4dabf7;
+    padding: 3rem;
+    text-align: center;
+    border-radius: 10px;
+    border: 2px solid #4dabf7;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Chart Header -->
+    <div class="chart-header text-center">
+        <div class="d-flex justify-content-between align-items-center">
+            <a href="{{ url_for('market.dashboard') }}" class="btn btn-outline-primary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+            </a>
+            <div>
+                <h1 class="display-5 mb-2">
+                    <i class="fas fa-chart-candlestick me-3"></i>NIFTY Index Chart
+                </h1>
+                <p class="lead mb-0">Custom Python Chart with MACD Analysis</p>
+                <small>Real-time Buy/Sell Signals • MACD(12,26,9) • No External Dependencies</small>
+            </div>
+            <div>
+                <button class="btn btn-outline-success me-2" onclick="refreshChart()" id="refreshBtn">
+                    <i class="fas fa-sync-alt me-2"></i>Refresh Chart
+                </button>
+                <button class="btn btn-outline-info" onclick="showMACDInfo()" id="infoBtn">
+                    <i class="fas fa-info-circle me-2"></i>MACD Info
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Date/Time Filter -->
+    {% include 'components/datetime_filter.html' %}
+
+    <!-- Current Status Row -->
+    <div class="row mb-4">
+        <!-- Current Price -->
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card signal-card text-white h-100">
+                <div class="card-body text-center">
+                    <h5 class="card-title">
+                        <i class="fas fa-chart-line me-2"></i>NIFTY Current
+                    </h5>
+                    <h2 id="currentPrice">
+                        {% if current_data and current_data.price %}
+                            {{ "%.2f"|format(current_data.price) }}
+                        {% else %}
+                            ---.--
+                        {% endif %}
+                    </h2>
+                    <small id="priceChange" class="price-change-neutral">
+                        {% if current_data and current_data.change %}
+                            {% if current_data.change >= 0 %}
+                                <span class="price-change-positive">+{{ "%.2f"|format(current_data.change) }} (+{{ "%.2f"|format(current_data.change_percent) }}%)</span>
+                            {% else %}
+                                <span class="price-change-negative">{{ "%.2f"|format(current_data.change) }} ({{ "%.2f"|format(current_data.change_percent) }}%)</span>
+                            {% endif %}
+                        {% else %}
+                            -- (--%)
+                        {% endif %}
+                    </small>
+                    <br><small id="lastUpdate">
+                        {% if current_data and current_data.timestamp %}
+                            Last updated: {{ current_data.timestamp }}
+                        {% else %}
+                            Last updated: --:--
+                        {% endif %}
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <!-- MACD Signal -->
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card h-100 {% if latest_signal %}{% if latest_signal.signal in ['BUY', 'BULLISH'] %}buy-signal{% elif latest_signal.signal in ['SELL', 'BEARISH'] %}sell-signal{% else %}neutral-signal{% endif %}{% else %}neutral-signal{% endif %}" id="macdSignalCard">
+                <div class="card-body text-center">
+                    <h5 class="card-title">
+                        <i class="fas fa-chart-bar me-2"></i>MACD Signal
+                    </h5>
+                    <h2 id="macdSignal">
+                        {% if latest_signal %}{{ latest_signal.signal }}{% else %}NEUTRAL{% endif %}
+                    </h2>
+                    <small id="signalStrength">
+                        Strength: {% if latest_signal %}{{ latest_signal.strength }}{% else %}--{% endif %}
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <!-- MACD Values -->
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card signal-card text-white h-100">
+                <div class="card-body">
+                    <h5 class="card-title text-center">
+                        <i class="fas fa-calculator me-2"></i>MACD Values
+                    </h5>
+                    <div class="macd-values">
+                        <div class="d-flex justify-content-between">
+                            <span>MACD Line:</span>
+                            <span id="macdLine">{% if latest_signal %}{{ latest_signal.macd_line }}{% else %}--{% endif %}</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>Signal Line:</span>
+                            <span id="signalLine">{% if latest_signal %}{{ latest_signal.signal_line }}{% else %}--{% endif %}</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>Histogram:</span>
+                            <span id="histogram">{% if latest_signal %}{{ latest_signal.histogram }}{% else %}--{% endif %}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chart Stats -->
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card signal-card text-white h-100">
+                <div class="card-body text-center">
+                    <h5 class="card-title">
+                        <i class="fas fa-chart-pie me-2"></i>Chart Info
+                    </h5>
+                    <div class="row text-center">
+                        <div class="col-12 mb-2">
+                            <h4 id="dataPoints" class="text-info">{{ data_points or 0 }}</h4>
+                            <small>Data Points</small>
+                        </div>
+                        <div class="col-12">
+                            <small class="text-muted">Timeframe: {{ timeframe|upper or '30MIN' }}</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart Container -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card bg-dark text-white">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-candlestick me-2"></i>NIFTY Custom Chart with MACD
+                    </h5>
+                    <div class="chart-controls d-flex align-items-center">
+                        <div class="form-check form-switch me-3">
+                            <input class="form-check-input" type="checkbox" id="autoRefresh" checked>
+                            <label class="form-check-label text-white" for="autoRefresh">Auto Refresh</label>
+                        </div>
+                        <select class="form-select form-select-sm me-2" id="timeframeSelect" onchange="changeTimeframe()">
+                            <option value="30min" {% if timeframe == '30min' %}selected{% endif %}>30 Minutes</option>
+                            <option value="15min" {% if timeframe == '15min' %}selected{% endif %}>15 Minutes</option>
+                            <option value="1hour" {% if timeframe == '1hour' %}selected{% endif %}>1 Hour</option>
+                            <option value="1day" {% if timeframe == '1day' %}selected{% endif %}>Daily</option>
+                        </select>
+                        <select class="form-select form-select-sm me-2" id="daysSelect" onchange="changeDays()">
+                            <option value="7">7 Days</option>
+                            <option value="15">15 Days</option>
+                            <option value="30" selected>30 Days</option>
+                            <option value="60">60 Days</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div id="custom_chart" style="height: 450px; overflow: hidden;">
+                        {% if success and chart_html %}
+                            {{ chart_html|safe }}
+                        {% elif error %}
+                            <div class="chart-error">
+                                <i class="fas fa-exclamation-triangle fa-3x mb-3"></i>
+                                <h4>Chart Error</h4>
+                                <p>{{ error }}</p>
+                                <button class="btn btn-outline-danger" onclick="refreshChart()">
+                                    <i class="fas fa-retry me-2"></i>Try Again
+                                </button>
+                            </div>
+                        {% else %}
+                            <div class="chart-loading">
+                                <i class="fas fa-spinner fa-spin fa-3x mb-3"></i>
+                                <h4>Loading Chart...</h4>
+                                <p>Generating NIFTY chart with MACD analysis</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart Information Cards -->
+    <div class="row mb-3">
+        <div class="col-lg-4 mb-3">
+            <div class="card bg-dark text-white h-100">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-cog me-2"></i>MACD Settings
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-6">
+                            <h6 class="text-success">📈 Buy:</h6>
+                            <small>
+                                • MACD > Signal line<br>
+                                • Histogram positive<br>
+                                • Momentum up
+                            </small>
+                        </div>
+                        <div class="col-6">
+                            <h6 class="text-danger">� Sell:</h6>
+                            <small>
+                                • MACD < Signal line<br>
+                                • Histogram negative<br>
+                                • Momentum down
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4 mb-3">
+            <div class="card bg-dark text-white h-100">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-info-circle me-2"></i>Chart Features
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-6">
+                            <h6 class="text-success">✅ Benefits:</h6>
+                            <small>
+                                • Own NIFTY data<br>
+                                • No TradingView<br>
+                                • Custom MACD<br>
+                                • Real-time updates
+                            </small>
+                        </div>
+                        <div class="col-6">
+                            <h6 class="text-info">� Technical:</h6>
+                            <small>
+                                • OHLC candlesticks<br>
+                                • 12/26/9 MACD<br>
+                                • Multiple timeframes<br>
+                                • {{ data_points or 0 }} data points
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4 mb-3">
+            <div class="card bg-dark text-white h-100">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-chart-line me-2"></i>Implementation
+                    </h6>
+                </div>
+                <div class="card-body text-center">
+                    <div class="alert alert-info mb-0">
+                        <small>
+                            <strong>Custom Python Chart:</strong><br>
+                            Generated using Plotly with your own NIFTY database data. 
+                            Completely independent of external services.
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let refreshInterval;
+
+// Refresh chart by reloading page with current parameters
+function refreshChart() {
+    const refreshBtn = document.getElementById('refreshBtn');
+    refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Refreshing...';
+    
+    const timeframe = document.getElementById('timeframeSelect').value;
+    const days = document.getElementById('daysSelect').value;
+    
+    // Reload page with parameters
+    window.location.href = `/nifty-chart?timeframe=${timeframe}&days=${days}`;
+}
+
+// Change timeframe
+function changeTimeframe() {
+    const timeframe = document.getElementById('timeframeSelect').value;
+    const days = document.getElementById('daysSelect').value;
+    
+    window.location.href = `/nifty-chart?timeframe=${timeframe}&days=${days}`;
+}
+
+// Change days
+function changeDays() {
+    const timeframe = document.getElementById('timeframeSelect').value;
+    const days = document.getElementById('daysSelect').value;
+    
+    window.location.href = `/nifty-chart?timeframe=${timeframe}&days=${days}`;
+}
+
+// Show MACD info modal
+function showMACDInfo() {
+    alert(`Custom NIFTY Chart - MACD Information:
+
+🏗️ Custom Implementation:
+- Built with Python & Plotly
+- Uses your own NIFTY database
+- No external service dependencies
+- Real-time data from your system
+
+📊 MACD Calculation:
+- MACD Line = 12-period EMA - 26-period EMA
+- Signal Line = 9-period EMA of MACD Line
+- Histogram = MACD Line - Signal Line
+
+📈 Buy Signals:
+- MACD line crosses above Signal line
+- Histogram turns positive
+- Upward momentum confirmed
+
+📉 Sell Signals:
+- MACD line crosses below Signal line
+- Histogram turns negative
+- Downward momentum confirmed
+
+⚠️ Advantages:
+- No TradingView blocking issues
+- Uses your collected NIFTY data
+- Customizable timeframes and periods
+- Full control over calculations`);
+}
+
+// Auto refresh setup
+document.addEventListener('DOMContentLoaded', function() {
+    // Set up auto-refresh every 2 minutes
+    refreshInterval = setInterval(() => {
+        if (document.getElementById('autoRefresh') && document.getElementById('autoRefresh').checked) {
+            // Refresh silently by fetching new data
+            const timeframe = document.getElementById('timeframeSelect').value;
+            const days = document.getElementById('daysSelect').value;
+            
+            fetch(`/api/chart-data?timeframe=${timeframe}&days=${days}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.chart_html) {
+                        // Update chart container
+                        document.getElementById('custom_chart').innerHTML = data.chart_html;
+                        
+                        // Update current data if available
+                        if (data.current_data) {
+                            updateCurrentData(data.current_data);
+                        }
+                        
+                        // Update MACD signal if available
+                        if (data.latest_signal) {
+                            updateMACDSignal(data.latest_signal);
+                        }
+                        
+                        console.log('Chart refreshed at', new Date().toLocaleTimeString());
+                    }
+                })
+                .catch(error => {
+                    console.error('Auto-refresh error:', error);
+                });
+        }
+    }, 120000); // 2 minutes
+});
+
+// Update current data display
+function updateCurrentData(data) {
+    if (data.price) {
+        document.getElementById('currentPrice').textContent = data.price.toFixed(2);
+    }
+    
+    if (data.change !== undefined) {
+        const changeElement = document.getElementById('priceChange');
+        if (data.change >= 0) {
+            changeElement.innerHTML = `<span class="price-change-positive">+${data.change.toFixed(2)} (+${data.change_percent.toFixed(2)}%)</span>`;
+        } else {
+            changeElement.innerHTML = `<span class="price-change-negative">${data.change.toFixed(2)} (${data.change_percent.toFixed(2)}%)</span>`;
+        }
+    }
+    
+    if (data.timestamp) {
+        document.getElementById('lastUpdate').textContent = `Last updated: ${data.timestamp}`;
+    }
+}
+
+// Update MACD signal display
+function updateMACDSignal(signal) {
+    const signalCard = document.getElementById('macdSignalCard');
+    document.getElementById('macdSignal').textContent = signal.signal;
+    document.getElementById('signalStrength').textContent = `Strength: ${signal.strength}`;
+    
+    // Update card styling
+    signalCard.className = 'card h-100 ';
+    if (signal.signal === 'BUY' || signal.signal === 'BULLISH') {
+        signalCard.className += 'buy-signal';
+    } else if (signal.signal === 'SELL' || signal.signal === 'BEARISH') {
+        signalCard.className += 'sell-signal';
+    } else {
+        signalCard.className += 'neutral-signal';
+    }
+    
+    // Update MACD values
+    document.getElementById('macdLine').textContent = signal.macd_line;
+    document.getElementById('signalLine').textContent = signal.signal_line;
+    document.getElementById('histogram').textContent = signal.histogram;
+}
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', function() {
+    if (refreshInterval) {
+        clearInterval(refreshInterval);
+    }
+});
+</script>
+{% endblock %}

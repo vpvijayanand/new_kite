@@ -22,16 +22,20 @@ def create_app(config_name='default'):
     from app.controllers.market_controller import market_bp, init_scheduler
     from app.controllers.admin_controller import admin_bp
     from app.controllers.strategy_controller import strategy_bp
+    from app.controllers.oi_crossover_controller import oi_crossover_bp
+    from app.controllers.futures_oi_controller import futures_oi_bp
     from app.api.routes import api_bp
     
     app.register_blueprint(auth_bp)
     app.register_blueprint(market_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(strategy_bp)
+    app.register_blueprint(oi_crossover_bp)
+    app.register_blueprint(futures_oi_bp)
     app.register_blueprint(api_bp, url_prefix='/api')
     
     # Import models to ensure they're registered with SQLAlchemy
-    from app.models import nifty_price, banknifty_price, expiry_settings, nifty_stocks, strategy_models
+    from app.models import nifty_price, banknifty_price, expiry_settings, nifty_stocks, strategy_models, futures_oi_data
     
     # Create tables
     with app.app_context():

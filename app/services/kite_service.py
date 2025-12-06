@@ -149,9 +149,14 @@ class KiteService:
             
             if "NSE:NIFTY 50" in quote:
                 data = quote["NSE:NIFTY 50"]
+                ohlc = data.get('ohlc', {})
                 return {
                     'symbol': 'NIFTY 50',
                     'price': data['last_price'],
+                    'high': ohlc.get('high', data['last_price']),
+                    'low': ohlc.get('low', data['last_price']),
+                    'open': ohlc.get('open', data['last_price']),
+                    'close': ohlc.get('close', data['last_price']),
                     'change': data.get('change'),
                     'change_percent': data.get('change_percent', 0)
                 }
@@ -175,9 +180,14 @@ class KiteService:
             
             if "NSE:NIFTY BANK" in quote:
                 data = quote["NSE:NIFTY BANK"]
+                ohlc = data.get('ohlc', {})
                 return {
                     'symbol': 'NIFTY BANK',
                     'price': data['last_price'],
+                    'high': ohlc.get('high', data['last_price']),
+                    'low': ohlc.get('low', data['last_price']),
+                    'open': ohlc.get('open', data['last_price']),
+                    'close': ohlc.get('close', data['last_price']),
                     'change': data.get('change'),
                     'change_percent': data.get('change_percent', 0)
                 }

@@ -146,6 +146,9 @@
 
 {% block content %}
 <div class="container-fluid">
+    <!-- Date/Time Filter -->
+    {% include 'components/datetime_filter.html' %}
+    
     <!-- Header Section -->
     <div class="row mb-4">
         <div class="col-12">
@@ -164,6 +167,37 @@
                     </small>
                     <br><small class="text-muted" id="lastUpdate">Last updated: <span id="updateTime"></span></small>
                     <br><small class="text-info" id="refreshCountdown">Next refresh in: 60s</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Access Row -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card bg-dark text-white">
+                <div class="card-body py-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-0 text-info">
+                                <i class="fas fa-rocket me-2"></i>Quick Access
+                            </h6>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <a href="{{ url_for('market.nifty_chart') }}" class="btn btn-sm btn-outline-success">
+                                <i class="fas fa-chart-candlestick me-1"></i>NIFTY Chart & MACD
+                            </a>
+                            <a href="{{ url_for('strategy.strategy_1') }}" class="btn btn-sm btn-outline-warning">
+                                <i class="fas fa-chart-line-up me-1"></i>Strategy 1 Dashboard
+                            </a>
+                            <a href="{{ url_for('market.option_chain') }}?underlying=NIFTY" class="btn btn-sm btn-outline-info">
+                                <i class="fas fa-chart-line me-1"></i>NIFTY Options
+                            </a>
+                            <a href="{{ url_for('market.oi_analysis') }}?underlying=NIFTY" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-analytics me-1"></i>OI Analysis
+                            </a>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

@@ -1,9 +1,12 @@
 from flask import Blueprint, render_template, jsonify, current_app, request, redirect, url_for, send_from_directory
 from app.services.market_service import MarketService
+from app.services.chart_service import ChartService
+from app.services.datetime_filter_service import DateTimeFilterService
 from app.middlewares.auth_middleware import login_required
 from apscheduler.schedulers.background import BackgroundScheduler
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from app.controllers.oi_controller import oi_changes
+from app import db
 
 market_bp = Blueprint('market', __name__)
 
@@ -131,8 +134,8 @@ def dashboard():
         print(f"Error loading dashboard data: {str(e)}")
         # If data loading fails, provide fallback data for dashboard template
         fallback_data = {
-            'nifty_price': {'price': 24500.75, 'change_percent': 1.25},
-            'banknifty_price': {'price': 52300.50, 'change_percent': -0.85}
+            'nifty_price': {'price': 26134.75, 'change_percent': 0.81},
+            'banknifty_price': {'price': 59605.8, 'change_percent': 0.53}
         }
         return render_template('dashboard.html', **fallback_data)
 
@@ -140,42 +143,146 @@ def dashboard():
 # @login_required  # Temporarily disabled for testing
 def dashboard_new():
     try:
+        # Initialize services
         market_service = MarketService()
+        date_filter = DateTimeFilterService()
+        
+        # Parse date/time parameters with today as default
+        start_date, end_date, start_time, end_time = date_filter.parse_date_params(
+            request.args, default_today=True
+        )
         
         # Get comprehensive dashboard data
         dashboard_data = market_service.get_comprehensive_dashboard_data()
         
+        # Add date filter parameters for template
+        dashboard_data.update({
+            'start_date': start_date.strftime('%Y-%m-%d') if start_date else None,
+            'end_date': end_date.strftime('%Y-%m-%d') if end_date else None,
+            'start_time': start_time.strftime('%H:%M') if start_time else None,
+            'end_time': end_time.strftime('%H:%M') if end_time else None,
+            'today_date': date.today().strftime('%Y-%m-%d')
+        })
+        
         return render_template('dashboard_new.html', **dashboard_data)
     except Exception as e:
         print(f"Error loading new dashboard data: {str(e)}")
-        # Fallback data for new dashboard
+        # Fallback data for new dashboard with current market values
         fallback_data = {
-            'nifty_price': {'price': 24500.75, 'change_percent': 1.25},
-            'banknifty_price': {'price': 52300.50, 'change_percent': -0.85},
+            'nifty_price': {'price': 26134.75, 'change_percent': 0.81},
+            'banknifty_price': {'price': 59605.8, 'change_percent': 0.53},
             'top_gainers': [],
             'top_losers': [],
-            'influence_summary': {'positive': 0.0, 'negative': 0.0}
+            'influence_summary': {'positive': 0.0, 'negative': 0.0, 'net': 0.0},
+            'start_date': date.today().strftime('%Y-%m-%d'),
+            'end_date': date.today().strftime('%Y-%m-%d'),
+            'start_time': '09:00',
+            'end_time': '15:30',
+            'today_date': date.today().strftime('%Y-%m-%d')
         }
         return render_template('dashboard_new.html', **fallback_data)
 
 @market_bp.route('/nifty-prices')
 @login_required
 def nifty_prices():
-    return render_template('nifty_prices.html')
+    # Initialize date filter service
+    date_filter = DateTimeFilterService()
+    
+    # Parse date/time parameters with today as default
+    start_date, end_date, start_time, end_time = date_filter.parse_date_params(
+        request.args, default_today=True
+    )
+    
+    return render_template('nifty_prices.html',
+                         start_date=start_date.strftime('%Y-%m-%d') if start_date else None,
+                         end_date=end_date.strftime('%Y-%m-%d') if end_date else None,
+                         start_time=start_time.strftime('%H:%M') if start_time else None,
+                         end_time=end_time.strftime('%H:%M') if end_time else None)
+
+@market_bp.route('/nifty-chart')
+@login_required
+def nifty_chart():
+    """NIFTY Index Chart with 30-min MACD Analysis"""
+    # Initialize date filter service
+    date_filter = DateTimeFilterService()
+    
+    # Parse date/time parameters with today as default
+    start_date, end_date, start_time, end_time = date_filter.parse_date_params(
+        request.args, default_today=True
+    )
+    
+    # Get timeframe from query params
+    timeframe = request.args.get('timeframe', '30min')
+    days_back = int(request.args.get('days', 30))
+    
+    # Create start and end datetime for chart service
+    start_datetime = datetime.combine(start_date, start_time) if start_date else None
+    end_datetime = datetime.combine(end_date, end_time) if end_date else None
+    
+    # Generate chart using our custom service with date filter
+    chart_service = ChartService()
+    chart_data = chart_service.generate_interactive_chart_with_date_filter(
+        timeframe=timeframe, 
+        days_back=days_back,
+        start_datetime=start_datetime,
+        end_datetime=end_datetime
+    )
+    
+    # Add date filter parameters for template
+    if isinstance(chart_data, dict):
+        chart_data.update({
+            'start_date': start_date.strftime('%Y-%m-%d') if start_date else None,
+            'end_date': end_date.strftime('%Y-%m-%d') if end_date else None,
+            'start_time': start_time.strftime('%H:%M') if start_time else None,
+            'end_time': end_time.strftime('%H:%M') if end_time else None,
+            'today_date': date.today().strftime('%Y-%m-%d'),
+            'timeframe': timeframe,
+            'days_back': days_back
+        })
+    
+    return render_template('nifty_chart_custom.html', **chart_data)
 
 @market_bp.route('/option-chain')
 @login_required
 def option_chain():
     """Option chain analysis page"""
     underlying = request.args.get('underlying', 'NIFTY')
-    return render_template('option_chain.html', underlying=underlying)
+    
+    # Initialize date filter service
+    date_filter = DateTimeFilterService()
+    
+    # Parse date/time parameters with today as default
+    start_date, end_date, start_time, end_time = date_filter.parse_date_params(
+        request.args, default_today=True
+    )
+    
+    return render_template('option_chain.html', 
+                         underlying=underlying,
+                         start_date=start_date.strftime('%Y-%m-%d') if start_date else None,
+                         end_date=end_date.strftime('%Y-%m-%d') if end_date else None,
+                         start_time=start_time.strftime('%H:%M') if start_time else None,
+                         end_time=end_time.strftime('%H:%M') if end_time else None)
 
 @market_bp.route('/oi-analysis')
 @login_required
 def oi_analysis():
     """Detailed OI analysis page"""
     underlying = request.args.get('underlying', 'NIFTY')
-    return render_template('oi_analysis.html', underlying=underlying)
+    
+    # Initialize date filter service
+    date_filter = DateTimeFilterService()
+    
+    # Parse date/time parameters with today as default
+    start_date, end_date, start_time, end_time = date_filter.parse_date_params(
+        request.args, default_today=True
+    )
+    
+    return render_template('oi_analysis.html', 
+                         underlying=underlying,
+                         start_date=start_date.strftime('%Y-%m-%d') if start_date else None,
+                         end_date=end_date.strftime('%Y-%m-%d') if end_date else None,
+                         start_time=start_time.strftime('%H:%M') if start_time else None,
+                         end_time=end_time.strftime('%H:%M') if end_time else None)
 
 @market_bp.route('/fetch-now')
 @login_required
@@ -202,6 +309,111 @@ def fetch_now():
             }
         })
     except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+@market_bp.route('/api/current-nifty')
+@login_required
+def api_current_nifty():
+    """API endpoint for current NIFTY price data"""
+    try:
+        market_service = MarketService()
+        
+        # Get current and previous NIFTY price
+        current_price = market_service.get_current_nifty_price()
+        
+        if not current_price:
+            return jsonify({
+                'success': False,
+                'message': 'No NIFTY data available'
+            }), 404
+        
+        # Get previous day's closing price for change calculation
+        from app.models.nifty_price import NiftyPrice
+        from datetime import date, timedelta
+        import pytz
+        
+        ist = pytz.timezone('Asia/Kolkata')
+        yesterday = date.today() - timedelta(days=1)
+        
+        previous_close = db.session.query(NiftyPrice).filter(
+            db.func.date(NiftyPrice.timestamp) == yesterday
+        ).order_by(NiftyPrice.timestamp.desc()).first()
+        
+        # Calculate change
+        change = 0
+        change_percent = 0
+        if previous_close:
+            prev_price = float(previous_close.price)
+            curr_price = float(current_price['price'])
+            change = curr_price - prev_price
+            change_percent = (change / prev_price) * 100
+        
+        return jsonify({
+            'success': True,
+            'price': float(current_price['price']),
+            'high': float(current_price.get('high', 0)),
+            'low': float(current_price.get('low', 0)),
+            'change': change,
+            'change_percent': change_percent,
+            'timestamp': current_price['timestamp'].isoformat() if current_price.get('timestamp') else None,
+            'last_updated': datetime.now(ist).isoformat()
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"Error getting current NIFTY data: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+@market_bp.route('/api/macd-analysis')
+@login_required  
+def api_macd_analysis():
+    """API endpoint for NIFTY MACD analysis"""
+    try:
+        from app.services.technical_analysis_service import TechnicalAnalysisService
+        
+        timeframe = request.args.get('timeframe', 30, type=int)
+        
+        ta_service = TechnicalAnalysisService()
+        analysis = ta_service.get_nifty_macd_analysis(timeframe)
+        
+        return jsonify({
+            'success': True,
+            'macd_data': analysis['macd_data'],
+            'signal_history': analysis['signal_history'],
+            'timeframe': f'{timeframe} minutes',
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"Error getting MACD analysis: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+@market_bp.route('/api/signal-stats')
+@login_required
+def api_signal_stats():
+    """API endpoint for signal statistics"""
+    try:
+        from app.services.technical_analysis_service import TechnicalAnalysisService
+        
+        ta_service = TechnicalAnalysisService()
+        stats = ta_service.get_signal_stats()
+        
+        return jsonify({
+            'success': True,
+            'stats': stats,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"Error getting signal stats: {str(e)}")
         return jsonify({
             'success': False,
             'message': str(e)
@@ -291,6 +503,7 @@ def api_oi_analysis(underlying):
 @login_required
 def oi_changes_page():
     """Display OI changes analysis page"""
+    from app.controllers.oi_controller import oi_changes
     return oi_changes()
 
 @market_bp.route('/oi-history')
@@ -323,10 +536,24 @@ def nifty_stocks_page():
 
 @market_bp.route('/api/dashboard-comprehensive')
 def dashboard_comprehensive_api():
-    """API endpoint for comprehensive dashboard data"""
+    """API endpoint for comprehensive dashboard data with date filtering"""
     try:
+        # Initialize services
         market_service = MarketService()
-        dashboard_data = market_service.get_comprehensive_dashboard_data()
+        date_filter = DateTimeFilterService()
+        
+        # Parse date/time parameters with today as default
+        start_date, end_date, start_time, end_time = date_filter.parse_date_params(
+            request.args, default_today=True
+        )
+        
+        # Get comprehensive dashboard data with date filters
+        dashboard_data = market_service.get_comprehensive_dashboard_data(
+            start_date=start_date, 
+            end_date=end_date,
+            start_time=start_time,
+            end_time=end_time
+        )
         return jsonify(dashboard_data)
     except Exception as e:
         print(f"Error in comprehensive dashboard data API: {str(e)}")
@@ -354,10 +581,21 @@ def oi_timeline_api():
 
 @market_bp.route('/api/market-signal')
 def api_market_signal():
-    """API endpoint for market signal analysis"""
+    """API endpoint for market signal analysis with date filtering"""
     try:
+        # Initialize services
         market_service = MarketService()
-        signal_data = market_service.get_market_signal_analysis()
+        date_filter = DateTimeFilterService()
+        
+        # Parse date/time parameters with today as default
+        start_date, end_date, start_time, end_time = date_filter.parse_date_params(
+            request.args, default_today=True
+        )
+        
+        # Get market signal analysis for the specified date
+        signal_data = market_service.get_market_signal_analysis(
+            target_date=end_date if end_date else None
+        )
         return jsonify({
             'success': True,
             'data': signal_data
@@ -478,4 +716,49 @@ def get_top_oi_strikes():
             'success': False,
             'error': str(e),
             'data': {'NIFTY': [], 'BANKNIFTY': []}
+        }), 500
+
+@market_bp.route('/api/chart-data')
+def get_chart_data():
+    """Get NIFTY chart data with MACD"""
+    try:
+        timeframe = request.args.get('timeframe', '30min')
+        days_back = int(request.args.get('days', 30))
+        
+        chart_service = ChartService()
+        chart_data = chart_service.generate_interactive_chart(timeframe, days_back)
+        
+        return jsonify(chart_data)
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@market_bp.route('/api/macd-signal')
+def get_macd_signal():
+    """Get current MACD signal analysis"""
+    try:
+        timeframe = request.args.get('timeframe', '30min')
+        
+        chart_service = ChartService()
+        signal_data = chart_service.get_signal_analysis(timeframe)
+        
+        if signal_data:
+            return jsonify({
+                'success': True,
+                'signal_data': signal_data,
+                'timestamp': datetime.utcnow().isoformat()
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'No MACD data available'
+            }), 404
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
         }), 500

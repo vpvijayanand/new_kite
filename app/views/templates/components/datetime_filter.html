@@ -1,0 +1,171 @@
+<!-- Date/Time Filter Component -->
+<div class="card bg-dark text-white mb-3">
+    <div class="card-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <h6 class="mb-0">
+                <i class="fas fa-calendar-alt me-2"></i>Date & Time Filter
+            </div>
+            <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" 
+                    data-bs-target="#dateTimeFilter" aria-expanded="false" aria-controls="dateTimeFilter">
+                <i class="fas fa-filter me-1"></i>Filter Options
+            </button>
+        </div>
+    </div>
+    
+    <div class="collapse" id="dateTimeFilter">
+        <div class="card-body">
+            <form method="GET" id="dateTimeFilterForm">
+                <div class="row">
+                    <!-- Quick Date Options -->
+                    <div class="col-lg-3 col-md-6 mb-3">
+                        <label class="form-label">Quick Select</label>
+                        <div class="btn-group-vertical d-grid gap-1" role="group">
+                            <button type="button" class="btn btn-sm btn-outline-info" onclick="setQuickDate('today')">
+                                Today
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-info" onclick="setQuickDate('yesterday')">
+                                Yesterday
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-info" onclick="setQuickDate('last_3_days')">
+                                Last 3 Days
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-info" onclick="setQuickDate('last_week')">
+                                Last 7 Days
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Custom Date Range -->
+                    <div class="col-lg-4 col-md-6 mb-3">
+                        <div class="row">
+                            <div class="col-6">
+                                <label for="startDate" class="form-label">Start Date</label>
+                                <input type="date" class="form-control form-control-sm" id="startDate" name="start_date" 
+                                       value="{{ start_date or today_date }}">
+                            </div>
+                            <div class="col-6">
+                                <label for="endDate" class="form-label">End Date</label>
+                                <input type="date" class="form-control form-control-sm" id="endDate" name="end_date" 
+                                       value="{{ end_date or today_date }}">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Time Range -->
+                    <div class="col-lg-3 col-md-6 mb-3">
+                        <div class="row">
+                            <div class="col-6">
+                                <label for="startTime" class="form-label">Start Time</label>
+                                <input type="time" class="form-control form-control-sm" id="startTime" name="start_time" 
+                                       value="{{ start_time or '09:00' }}">
+                            </div>
+                            <div class="col-6">
+                                <label for="endTime" class="form-label">End Time</label>
+                                <input type="time" class="form-control form-control-sm" id="endTime" name="end_time" 
+                                       value="{{ end_time or '15:30' }}">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Filter Actions -->
+                    <div class="col-lg-2 col-md-6 mb-3 d-flex flex-column justify-content-end">
+                        <button type="submit" class="btn btn-primary btn-sm mb-2">
+                            <i class="fas fa-search me-1"></i>Apply Filter
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="resetFilter()">
+                            <i class="fas fa-undo me-1"></i>Reset
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Preserve other URL parameters -->
+                {% for key, value in request.args.items() %}
+                    {% if key not in ['start_date', 'end_date', 'start_time', 'end_time'] %}
+                        <input type="hidden" name="{{ key }}" value="{{ value }}">
+                    {% endif %}
+                {% endfor %}
+            </form>
+            
+            <!-- Current Filter Display -->
+            <div class="mt-2 pt-2 border-top border-secondary">
+                <small class="text-muted">
+                    <strong>Current Filter:</strong> 
+                    {{ start_date or today_date }} {{ start_time or '09:00' }} 
+                    to 
+                    {{ end_date or today_date }} {{ end_time or '15:30' }}
+                    
+                    {% if start_date and start_date != today_date %}
+                        <span class="badge bg-info ms-2">Custom Date Range</span>
+                    {% else %}
+                        <span class="badge bg-success ms-2">Today</span>
+                    {% endif %}
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Date filter JavaScript functions
+const today = new Date().toISOString().split('T')[0];
+
+// Quick date selection functions
+function setQuickDate(option) {
+    const startDateInput = document.getElementById('startDate');
+    const endDateInput = document.getElementById('endDate');
+    const startTimeInput = document.getElementById('startTime');
+    const endTimeInput = document.getElementById('endTime');
+    
+    const today = new Date();
+    let startDate, endDate;
+    
+    switch(option) {
+        case 'today':
+            startDate = endDate = today;
+            break;
+        case 'yesterday':
+            startDate = endDate = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+            break;
+        case 'last_3_days':
+            startDate = new Date(today.getTime() - 2 * 24 * 60 * 60 * 1000);
+            endDate = today;
+            break;
+        case 'last_week':
+            startDate = new Date(today.getTime() - 6 * 24 * 60 * 60 * 1000);
+            endDate = today;
+            break;
+        default:
+            startDate = endDate = today;
+    }
+    
+    startDateInput.value = startDate.toISOString().split('T')[0];
+    endDateInput.value = endDate.toISOString().split('T')[0];
+    
+    // Set market hours by default
+    startTimeInput.value = '09:00';
+    endTimeInput.value = '15:30';
+}
+
+// Reset filter to today
+function resetFilter() {
+    document.getElementById('startDate').value = today;
+    document.getElementById('endDate').value = today;
+    document.getElementById('startTime').value = '09:00';
+    document.getElementById('endTime').value = '15:30';
+}
+
+// Auto-submit on date change (optional)
+document.addEventListener('DOMContentLoaded', function() {
+    const dateInputs = ['startDate', 'endDate', 'startTime', 'endTime'];
+    
+    dateInputs.forEach(inputId => {
+        const input = document.getElementById(inputId);
+        if (input) {
+            input.addEventListener('change', function() {
+                // Auto-submit after 1 second delay (optional)
+                // setTimeout(() => document.getElementById('dateTimeFilterForm').submit(), 1000);
+            });
+        }
+    });
+});
+</script>

@@ -52,6 +52,273 @@ def strategy_1_history():
         current_app.logger.error(f"Error in strategy_1_history: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+@strategy_bp.route('/api/strategy-1/fix-entry-data')
+@login_required
+def fix_entry_data():
+    """Fix existing Strategy1Execution records that have 0.0 entry values"""
+    try:
+        from app.models.strategy_models import Strategy1Entry, Strategy1LTPHistory, Strategy1Execution
+        
+        today = date.today()
+        
+        # Find executions with missing entry data
+        broken_executions = db.session.query(Strategy1Execution).filter(
+            and_(
+                Strategy1Execution.execution_date == today,
+                Strategy1Execution.triggered == True,
+                or_(
+                    Strategy1Execution.sell_ltp_entry == 0.0,
+                    Strategy1Execution.sell_ltp_entry == None,
+                    Strategy1Execution.buy_ltp_entry == 0.0,
+                    Strategy1Execution.buy_ltp_entry == None
+                )
+            )
+        ).all()
+        
+        fixed_count = 0
+        
+        for execution in broken_executions:
+            if execution.sell_ltp_current and execution.buy_ltp_current:
+                # Use current LTP as entry LTP if entry is missing
+                if not execution.sell_ltp_entry or execution.sell_ltp_entry == 0.0:
+                    execution.sell_ltp_entry = execution.sell_ltp_current
+                
+                if not execution.buy_ltp_entry or execution.buy_ltp_entry == 0.0:
+                    execution.buy_ltp_entry = execution.buy_ltp_current
+                
+                if not execution.net_premium_entry or execution.net_premium_entry == 0.0:
+                    execution.net_premium_entry = execution.sell_ltp_entry - execution.buy_ltp_entry
+                
+                fixed_count += 1
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Fixed {fixed_count} execution records with missing entry data',
+            'fixed_executions': fixed_count,
+            'total_broken': len(broken_executions)
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error fixing entry data: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@strategy_bp.route('/api/strategy-1/complete-history')
+@login_required
+def strategy_1_complete_history():
+    """Comprehensive minute-by-minute history combining all data sources"""
+    try:
+        from app.models.strategy_models import Strategy1Entry, Strategy1LTPHistory, Strategy1Execution
+        from app.models.nifty_price import NiftyPrice
+        
+        today = date.today()
+        
+        # Get all NIFTY price records for today to build timeline
+        nifty_records = db.session.query(NiftyPrice).filter(
+            func.date(NiftyPrice.timestamp) == today
+        ).order_by(NiftyPrice.timestamp.asc()).all()
+        
+        # Get today's strategy entries and executions
+        entries = db.session.query(Strategy1Entry).filter(
+            Strategy1Entry.entry_date == today
+        ).all()
+        
+        executions = db.session.query(Strategy1Execution).filter(
+            Strategy1Execution.execution_date == today,
+            Strategy1Execution.triggered == True
+        ).all()
+        
+        # Build comprehensive timeline
+        timeline = []
+        entry_data = entries[0] if entries else None
+        execution_data = executions[0] if executions else None
+        
+        # If we have an active trade, get the range data
+        range_data = None
+        if execution_data:
+            range_data = {
+                'high': execution_data.range_high,
+                'low': execution_data.range_low,
+                'sell_strike': execution_data.sell_strike,
+                'buy_strike': execution_data.buy_strike,
+                'option_type': execution_data.option_type,
+                'sell_ltp_entry': execution_data.sell_ltp_entry,
+                'buy_ltp_entry': execution_data.buy_ltp_entry,
+                'net_premium_entry': execution_data.net_premium_entry,
+                'total_quantity': execution_data.total_quantity,
+                'capital_used': execution_data.capital_used,
+                'trigger_type': execution_data.trigger_type
+            }
+        
+        # Process each NIFTY price record
+        for nifty_record in nifty_records:
+            record_time = nifty_record.timestamp
+            nifty_price = float(nifty_record.price)
+            
+            # Initialize record
+            history_record = {
+                'timestamp': record_time.strftime('%H:%M:%S'),
+                'datetime': record_time.isoformat(),
+                'nifty_price': nifty_price,
+                'triggered': False,
+                'trigger_type': None,
+                'sell_strike': None,
+                'buy_strike': None,
+                'option_type': None,
+                'sell_ltp_entry': None,
+                'buy_ltp_entry': None,
+                'sell_ltp_current': None,
+                'buy_ltp_current': None,
+                'net_premium_entry': None,
+                'net_premium_current': None,
+                'sell_pnl': 0,
+                'buy_pnl': 0,
+                'total_pnl': 0,
+                'pnl_percentage': 0,
+                'capital_used': 0,
+                'status': 'MONITORING'
+            }
+            
+            # Check if this NIFTY record is after the trade trigger time
+            # Since we have an active trade, mark all recent records as ACTIVE
+            is_after_trigger = False
+            if range_data and execution_data:
+                # For simplicity, mark records from last hour as ACTIVE if we have a trade
+                from datetime import timedelta
+                current_time = datetime.now()
+                if (current_time - record_time).total_seconds() < 3600:  # Last 1 hour
+                    is_after_trigger = True
+            
+            # If we have active trade data and this is likely after the trigger
+            if range_data and execution_data and is_after_trigger:
+                history_record.update({
+                    'triggered': True,
+                    'trigger_type': range_data['trigger_type'],
+                    'sell_strike': range_data['sell_strike'],
+                    'buy_strike': range_data['buy_strike'],
+                    'option_type': range_data['option_type'],
+                    'sell_ltp_entry': range_data['sell_ltp_entry'],
+                    'buy_ltp_entry': range_data['buy_ltp_entry'],
+                    'net_premium_entry': range_data['net_premium_entry'],
+                    'capital_used': range_data['capital_used'],
+                    'status': 'ACTIVE'
+                })
+                
+                # Use current execution data for LTPs (most recent available)
+                current_sell_ltp = execution_data.sell_ltp_current or range_data['sell_ltp_entry']
+                current_buy_ltp = execution_data.buy_ltp_current or range_data['buy_ltp_entry']
+                current_net_premium = current_sell_ltp - current_buy_ltp
+                
+                # Calculate P&L using correct formula
+                sell_pnl = (range_data['sell_ltp_entry'] - current_sell_ltp) * range_data['total_quantity']
+                buy_pnl = (current_buy_ltp - range_data['buy_ltp_entry']) * range_data['total_quantity']
+                total_pnl = sell_pnl + buy_pnl
+                pnl_percentage = (total_pnl / range_data['capital_used']) * 100 if range_data['capital_used'] > 0 else 0
+                
+                history_record.update({
+                    'sell_ltp_current': current_sell_ltp,
+                    'buy_ltp_current': current_buy_ltp,
+                    'net_premium_current': current_net_premium,
+                    'sell_pnl': sell_pnl,
+                    'buy_pnl': buy_pnl,
+                    'total_pnl': total_pnl,
+                    'pnl_percentage': pnl_percentage
+                })
+            
+            # Check if this is the trigger point
+            elif range_data and not history_record['triggered']:
+                # Calculate theoretical positions for this price point
+                from app.services.strategy_service import StrategyService
+                strategy_service = StrategyService()
+                theoretical_positions = strategy_service.calculate_strategy_1_positions(
+                    range_data['high'], range_data['low'], nifty_price
+                )
+                
+                if theoretical_positions.get('triggered'):
+                    history_record['status'] = 'TRIGGER_POINT'
+                    history_record.update({
+                        'triggered': True,
+                        'trigger_type': theoretical_positions.get('trigger_type'),
+                        'sell_strike': theoretical_positions.get('sell_strike'),
+                        'buy_strike': theoretical_positions.get('buy_strike'),
+                        'option_type': theoretical_positions.get('option_type'),
+                        'sell_ltp_entry': theoretical_positions.get('sell_ltp_entry'),
+                        'buy_ltp_entry': theoretical_positions.get('buy_ltp_entry'),
+                        'sell_ltp_current': theoretical_positions.get('sell_ltp'),
+                        'buy_ltp_current': theoretical_positions.get('buy_ltp'),
+                        'net_premium_current': theoretical_positions.get('net_premium'),
+                        'sell_pnl': theoretical_positions.get('sell_pnl', 0),
+                        'buy_pnl': theoretical_positions.get('buy_pnl', 0),
+                        'total_pnl': theoretical_positions.get('current_pnl', 0),
+                        'capital_used': theoretical_positions.get('capital_used', 0),
+                        'pnl_percentage': (theoretical_positions.get('current_pnl', 0) / theoretical_positions.get('capital_used', 1)) * 100 if theoretical_positions.get('capital_used', 0) > 0 else 0
+                    })
+            
+            timeline.append(history_record)
+        
+        # Get LTP history records if available
+        ltp_history_records = []
+        if entry_data:
+            ltp_history = db.session.query(Strategy1LTPHistory).filter(
+                Strategy1LTPHistory.entry_id == entry_data.id
+            ).order_by(Strategy1LTPHistory.timestamp.asc()).all()
+            
+            ltp_history_records = [record.to_dict() for record in ltp_history]
+        
+        result = {
+            'timeline': timeline,
+            'total_records': len(timeline),
+            'ltp_history': ltp_history_records,
+            'ltp_history_count': len(ltp_history_records),
+            'entry_data': entry_data.to_dict() if entry_data else None,
+            'execution_data': execution_data.to_dict() if execution_data else None,
+            'has_active_trade': execution_data is not None,
+            'range_data': range_data
+        }
+        
+        return jsonify(result)
+    except Exception as e:
+        current_app.logger.error(f"Error in strategy_1_complete_history: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@strategy_bp.route('/api/strategy-1/ltp-history')
+@login_required
+def strategy_1_ltp_history():
+    """API endpoint for detailed LTP history from new tracking tables"""
+    try:
+        from app.models.strategy_models import Strategy1Entry, Strategy1LTPHistory
+        
+        today = date.today()
+        
+        # Get today's entries
+        entries = db.session.query(Strategy1Entry).filter(
+            Strategy1Entry.entry_date == today
+        ).order_by(Strategy1Entry.entry_timestamp.desc()).all()
+        
+        result = {
+            'entries': [],
+            'total_entries': len(entries)
+        }
+        
+        for entry in entries:
+            # Get LTP history for this entry
+            ltp_history = db.session.query(Strategy1LTPHistory).filter(
+                Strategy1LTPHistory.entry_id == entry.id
+            ).order_by(Strategy1LTPHistory.timestamp.asc()).all()
+            
+            entry_data = entry.to_dict()
+            entry_data['ltp_history'] = [record.to_dict() for record in ltp_history]
+            entry_data['history_count'] = len(ltp_history)
+            
+            result['entries'].append(entry_data)
+        
+        return jsonify(result)
+    except Exception as e:
+        current_app.logger.error(f"Error in strategy_1_ltp_history: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 @strategy_bp.route('/api/strategy-1/execute')
 @login_required
 def execute_strategy_1():
@@ -64,10 +331,78 @@ def execute_strategy_1():
         current_app.logger.error(f"Error in execute_strategy_1: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+@strategy_bp.route('/api/strategy-1/create-tables')
+@login_required
+def create_strategy_tables():
+    """Create the new strategy tracking tables"""
+    try:
+        from app.models.strategy_models import Strategy1Entry, Strategy1LTPHistory
+        
+        # Create tables
+        db.create_all()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Strategy1Entry and Strategy1LTPHistory tables created successfully',
+            'tables': ['strategy1_entries', 'strategy1_ltp_history']
+        })
+    except Exception as e:
+        current_app.logger.error(f"Error creating tables: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@strategy_bp.route('/api/strategy-1/test-pnl')
+@login_required
+def test_pnl_calculation():
+    """Test P&L calculation with example values"""
+    try:
+        # Example: Bear Call Spread (Bearish breakout)
+        # Sell 24000 CE @ 110, Buy 24200 CE @ 80
+        # Later: Sell CE @ 90, Buy CE @ 70
+        
+        example_data = {
+            'strategy_type': 'Bear Call Spread',
+            'scenario': 'NIFTY fell as expected',
+            'entry': {
+                'sell_strike': 24000,
+                'buy_strike': 24200,
+                'sell_ltp': 110,
+                'buy_ltp': 80,
+                'net_credit': 110 - 80,  # 30
+                'quantity': 225
+            },
+            'current': {
+                'sell_ltp': 90,
+                'buy_ltp': 70,
+                'net_credit': 90 - 70   # 20
+            },
+            'pnl_calculation': {
+                'sell_pnl': (110 - 90) * 225,    # +4500
+                'buy_pnl': (70 - 80) * 225,      # -2250
+                'total_pnl': ((110 - 90) + (70 - 80)) * 225,  # +2250
+                'capital_used': (24200 - 24000) * 225,  # 45000
+                'return_percent': (((110 - 90) + (70 - 80)) * 225 / (45000)) * 100  # 5%
+            }
+        }
+        
+        return jsonify({
+            'success': True,
+            'example': example_data,
+            'explanation': {
+                'sell_pnl': 'Sell P&L = (Entry LTP - Current LTP) × Quantity = (110 - 90) × 225 = +4500',
+                'buy_pnl': 'Buy P&L = (Current LTP - Entry LTP) × Quantity = (70 - 80) × 225 = -2250',
+                'total_pnl': 'Total P&L = Sell P&L + Buy P&L = 4500 + (-2250) = +2250',
+                'logic': 'We profit when option prices decrease (favorable for credit spreads)'
+            }
+        })
+    except Exception as e:
+        current_app.logger.error(f"Error in test_pnl_calculation: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 from flask import jsonify
 from datetime import datetime, date, timedelta
 import pytz
 from app import db
+from sqlalchemy import and_, or_, func
 from app.models.nifty_price import NiftyPrice
 from app.models.banknifty_price import BankNiftyPrice, OptionChainData
 from sqlalchemy import text

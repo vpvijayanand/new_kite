@@ -9,8 +9,8 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     {% block extra_css %}{% endblock %}
 </head>
-<body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+<body class="kite-body">
+    <nav class="navbar navbar-expand-lg navbar-dark kite-navbar">
         <div class="container">
             <a class="navbar-brand" href="/">Kite Dashboard</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -68,6 +68,40 @@
                         </ul>
                     </li>
                     <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="chartsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-chart-candlestick me-1"></i>Charts & Technical Analysis
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="chartsDropdown">
+                            <li><a class="dropdown-item" href="{{ url_for('oi_crossover.oi_crossover') }}">
+                                <i class="fas fa-intersection me-1"></i>OI Change Crossover
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('futures_oi.futures_oi_analysis') }}">
+                                <i class="fas fa-chart-area me-1"></i>Futures OI Analysis
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" style="opacity: 0.6;" onclick="return false;">
+                                <i class="fas fa-chart-line me-1"></i>BANKNIFTY Chart - Coming Soon
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" style="opacity: 0.6;" onclick="return false;">
+                                <i class="fas fa-wave-square me-1"></i>RSI Analysis - Coming Soon
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" style="opacity: 0.6;" onclick="return false;">
+                                <i class="fas fa-chart-area me-1"></i>Bollinger Bands - Coming Soon
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" style="opacity: 0.6;" onclick="return false;">
+                                <i class="fas fa-signal me-1"></i>Stochastic - Coming Soon
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" style="opacity: 0.6;" onclick="return false;">
+                                <i class="fas fa-brain me-1"></i>Multi-Indicator Signals - Coming Soon
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" style="opacity: 0.6;" onclick="return false;">
+                                <i class="fas fa-search-chart me-1"></i>Pattern Recognition - Coming Soon
+                            </a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="strategiesDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="fas fa-chess-king me-1"></i>Trading Strategies
                         </a>
@@ -87,15 +121,22 @@
                             </a></li>
                         </ul>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('market.nifty_prices') }}">
-                            <i class="fas fa-list me-1"></i>Price History
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="niftyDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-chart-line me-1"></i>NIFTY
                         </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('market.nifty_stocks_page') }}">
-                            <i class="fas fa-building me-1"></i>NIFTY 50 Stocks
-                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="niftyDropdown">
+                            <li><a class="dropdown-item" href="{{ url_for('market.nifty_prices') }}">
+                                <i class="fas fa-history me-1"></i>Price History
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('market.nifty_stocks_page') }}">
+                                <i class="fas fa-building me-1"></i>NIFTY 50 Stocks
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('market.nifty_chart') }}">
+                                <i class="fas fa-chart-candlestick me-1"></i>NIFTY Chart & MACD
+                            </a></li>
+                        </ul>
                     </li>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">

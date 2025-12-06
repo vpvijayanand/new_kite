@@ -1,0 +1,525 @@
+{% extends "base.html" %}
+
+{% block title %}OI Change Crossover Analysis{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Custom date and time picker styling */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.7;
+    filter: invert(0.5);
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="time"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+    filter: invert(0.3);
+}
+
+input[type="date"]:focus,
+input[type="time"]:focus,
+select:focus {
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    border-color: #007bff;
+}
+
+.form-label i {
+    margin-right: 0.25rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .col-md-3 {
+        margin-bottom: 1rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="h3 mb-4">OI Change Crossover Analysis</h1>
+            
+            <!-- Date and Time Filter -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Date & Time Selection</h5>
+                </div>
+                <div class="card-body">
+                    <form id="filterForm" method="GET" class="row g-3">
+                        <div class="col-md-3">
+                            <label for="target_date" class="form-label">
+                                <i class="fas fa-calendar-alt text-primary"></i> Select Date
+                            </label>
+                            <input type="date" class="form-control" id="target_date" name="target_date" 
+                                   value="{{ target_date or start_date }}" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="start_time" class="form-label">
+                                <i class="fas fa-clock text-success"></i> Start Time
+                            </label>
+                            <input type="time" class="form-control" id="start_time" name="start_time" 
+                                   value="{{ start_time or '09:15' }}" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="end_time" class="form-label">
+                                <i class="fas fa-clock text-danger"></i> End Time
+                            </label>
+                            <input type="time" class="form-control" id="end_time" name="end_time" 
+                                   value="{{ end_time or '15:30' }}" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="underlying" class="form-label">
+                                <i class="fas fa-chart-line text-info"></i> Select Underlying
+                            </label>
+                            <select class="form-control" id="underlying" name="underlying" required>
+                                <option value="NIFTY" {{ 'selected' if underlying == 'NIFTY' else 'selected' }}>NIFTY</option>
+                                <option value="BANKNIFTY" {{ 'selected' if underlying == 'BANKNIFTY' else '' }}>BANKNIFTY</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-filter me-1"></i>Apply Filter
+                            </button>
+                            <button type="button" class="btn btn-secondary ms-2" onclick="resetFilters()">
+                                <i class="fas fa-refresh me-1"></i>Reset
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Summary Cards -->
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <div class="card bg-info text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h6 class="card-title">Total PE Change %</h6>
+                                    <h3 class="mb-0" id="totalPeChange">
+                                        {{ "%.2f"|format(summary_data.total_pe_change_percent) }}%
+                                    </h3>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-arrow-down fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-success text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h6 class="card-title">Total CE Change %</h6>
+                                    <h3 class="mb-0" id="totalCeChange">
+                                        {{ "%.2f"|format(summary_data.total_ce_change_percent) }}%
+                                    </h3>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-arrow-up fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card" id="differenceCard">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h6 class="card-title">Total Difference %</h6>
+                                    <h3 class="mb-0" id="totalDifference">
+                                        {{ "%.2f"|format(summary_data.total_difference_percent) }}%
+                                    </h3>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-exchange-alt fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Container -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">OI Change Crossover Chart</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container" style="height: 500px;">
+                                <canvas id="oiCrossoverChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Loading Spinner -->
+            <div id="loadingSpinner" class="text-center my-5" style="display: none;">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2">Loading OI crossover data...</p>
+            </div>
+
+            <!-- Error Message -->
+            <div id="errorMessage" class="alert alert-danger" style="display: none;">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <span id="errorText">An error occurred while loading data.</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+let oiChart = null;
+
+// Initialize the page
+document.addEventListener('DOMContentLoaded', function() {
+    initializeDateTimePickers();
+    loadChartData();
+    updateDifferenceCardColor();
+});
+
+// Form submission handler
+document.getElementById('filterForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    loadSummaryData();
+    loadChartData();
+});
+
+// Load summary data
+async function loadSummaryData() {
+    try {
+        showLoading(true);
+        
+        const params = new URLSearchParams({
+            target_date: document.getElementById('target_date').value,
+            start_time: document.getElementById('start_time').value,
+            end_time: document.getElementById('end_time').value,
+            underlying: document.getElementById('underlying').value
+        });
+        
+        const response = await fetch(`/api/oi-crossover-summary?${params}`);
+        const result = await response.json();
+        
+        if (result.success) {
+            updateSummaryCards(result.data);
+        } else {
+            showError(result.error || 'Failed to load summary data');
+        }
+    } catch (error) {
+        console.error('Error loading summary data:', error);
+        showError('Failed to load summary data');
+    } finally {
+        showLoading(false);
+    }
+}
+
+// Load chart data
+async function loadChartData() {
+    try {
+        showLoading(true);
+        
+        const params = new URLSearchParams({
+            target_date: document.getElementById('target_date').value,
+            start_time: document.getElementById('start_time').value,
+            end_time: document.getElementById('end_time').value,
+            underlying: document.getElementById('underlying').value
+        });
+        
+        const response = await fetch(`/api/oi-crossover-chart?${params}`);
+        const result = await response.json();
+        
+        if (result.success) {
+            updateChart(result.data);
+        } else {
+            showError(result.error || 'Failed to load chart data');
+        }
+    } catch (error) {
+        console.error('Error loading chart data:', error);
+        showError('Failed to load chart data');
+    } finally {
+        showLoading(false);
+    }
+}
+
+// Update summary cards
+function updateSummaryCards(data) {
+    document.getElementById('totalPeChange').textContent = `${data.total_pe_change_percent.toFixed(2)}%`;
+    document.getElementById('totalCeChange').textContent = `${data.total_ce_change_percent.toFixed(2)}%`;
+    document.getElementById('totalDifference').textContent = `${data.total_difference_percent.toFixed(2)}%`;
+    
+    updateDifferenceCardColor();
+}
+
+// Update difference card color based on value
+function updateDifferenceCardColor() {
+    const differenceText = document.getElementById('totalDifference').textContent;
+    const differenceValue = parseFloat(differenceText.replace('%', ''));
+    const card = document.getElementById('differenceCard');
+    
+    // Remove existing color classes
+    card.classList.remove('bg-success', 'bg-danger', 'bg-warning', 'text-white');
+    
+    if (differenceValue > 5) {
+        card.classList.add('bg-success', 'text-white');
+    } else if (differenceValue < -5) {
+        card.classList.add('bg-danger', 'text-white');
+    } else {
+        card.classList.add('bg-warning', 'text-white');
+    }
+}
+
+// Update chart with new data
+function updateChart(data) {
+    const ctx = document.getElementById('oiCrossoverChart').getContext('2d');
+    const selectedUnderlying = document.getElementById('underlying').value;
+    
+    if (oiChart) {
+        oiChart.destroy();
+    }
+    
+    // Dynamic opacity and styling based on selected underlying
+    const isNiftySelected = selectedUnderlying === 'NIFTY';
+    
+    // Primary (selected) underlying styles - full opacity
+    const primaryPeStyle = {
+        borderColor: '#dc3545',
+        backgroundColor: 'rgba(220, 53, 69, 0.1)',
+        borderWidth: 2,
+        pointRadius: 1
+    };
+    
+    const primaryCeStyle = {
+        borderColor: '#28a745',
+        backgroundColor: 'rgba(40, 167, 69, 0.1)',
+        borderWidth: 2,
+        pointRadius: 1
+    };
+    
+    // Secondary (non-selected) underlying styles - light opacity
+    const secondaryPeStyle = {
+        borderColor: 'rgba(220, 53, 69, 0.3)',
+        backgroundColor: 'rgba(220, 53, 69, 0.03)',
+        borderWidth: 1,
+        pointRadius: 0.3,
+        borderDash: [3, 3]
+    };
+    
+    const secondaryCeStyle = {
+        borderColor: 'rgba(40, 167, 69, 0.3)',
+        backgroundColor: 'rgba(40, 167, 69, 0.03)',
+        borderWidth: 1,
+        pointRadius: 0.3,
+        borderDash: [3, 3]
+    };
+    
+    oiChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.labels,
+            datasets: [
+                {
+                    label: `${selectedUnderlying} PE OI Change (Cumulative)`,
+                    data: data.pe_changes,
+                    ...primaryPeStyle,
+                    fill: false,
+                    yAxisID: 'y'
+                },
+                {
+                    label: `${selectedUnderlying} CE OI Change (Cumulative)`,
+                    data: data.ce_changes,
+                    ...primaryCeStyle,
+                    fill: false,
+                    yAxisID: 'y'
+                },
+                {
+                    label: `${selectedUnderlying} Price`,
+                    data: data.index_prices,
+                    borderColor: '#007bff',
+                    backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                    borderWidth: 3,
+                    fill: false,
+                    yAxisID: 'y1',
+                    pointRadius: 1
+                },
+                {
+                    label: `${isNiftySelected ? 'BankNifty' : 'NIFTY'} PE OI Change`,
+                    data: isNiftySelected ? (data.banknifty_pe_changes || []) : (data.nifty_pe_changes || []),
+                    ...secondaryPeStyle,
+                    fill: false,
+                    yAxisID: 'y',
+                    hidden: false
+                },
+                {
+                    label: `${isNiftySelected ? 'BankNifty' : 'NIFTY'} CE OI Change`,
+                    data: isNiftySelected ? (data.banknifty_ce_changes || []) : (data.nifty_ce_changes || []),
+                    ...secondaryCeStyle,
+                    fill: false,
+                    yAxisID: 'y',
+                    hidden: false
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'OI Change Crossover Analysis'
+                },
+                legend: {
+                    display: true,
+                    position: 'top'
+                },
+                tooltip: {
+                    callbacks: {
+                        title: function(context) {
+                            return `Time: ${context[0].label}`;
+                        },
+                        afterBody: function(context) {
+                            if (context.length >= 2) {
+                                // Get PE and CE values from the tooltip context - prioritize primary underlying
+                                const selectedUnderlying = document.getElementById('underlying').value;
+                                let primaryPeValue = null;
+                                let primaryCeValue = null;
+                                
+                                context.forEach(item => {
+                                    const label = item.dataset.label;
+                                    // Look for primary underlying's PE/CE values first
+                                    if (label.includes(selectedUnderlying) && label.includes('PE OI Change')) {
+                                        primaryPeValue = item.raw;
+                                    } else if (label.includes(selectedUnderlying) && label.includes('CE OI Change')) {
+                                        primaryCeValue = item.raw;
+                                    }
+                                });
+                                
+                                if (primaryPeValue !== null && primaryCeValue !== null) {
+                                    const difference = primaryPeValue - primaryCeValue;
+                                    const differencePercent = ((difference / Math.abs(primaryPeValue + primaryCeValue)) * 100).toFixed(2);
+                                    
+                                    return [
+                                        '',
+                                        `📊 ${selectedUnderlying} Difference: ${difference.toFixed(2)}`,
+                                        `📈 Difference %: ${differencePercent}%`,
+                                        `${difference > 0 ? '🔴 PE Dominance' : '🟢 CE Dominance'}`
+                                    ];
+                                }
+                            }
+                            return [];
+                        },
+                        label: function(context) {
+                            const label = context.dataset.label || '';
+                            const value = context.raw;
+                            
+                            if (label.includes('Price')) {
+                                return `${label}: ₹${value.toFixed(2)}`;
+                            } else {
+                                const sign = value >= 0 ? '+' : '';
+                                return `${label}: ${sign}${value.toFixed(2)}`;
+                            }
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    display: true,
+                    title: {
+                        display: true,
+                        text: 'Time'
+                    },
+                    grid: {
+                        display: true,
+                        drawOnChartArea: true,
+                        color: 'rgba(255, 255, 255, 0.1)',
+                        lineWidth: 0.5
+                    }
+                },
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    title: {
+                        display: true,
+                        text: 'OI Change (Cumulative)'
+                    },
+                    grid: {
+                        display: true,
+                        drawOnChartArea: true,
+                        color: 'rgba(255, 255, 255, 0.1)',
+                        lineWidth: 0.5
+                    },
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Index Price'
+                    },
+                    grid: {
+                        display: true,
+                        drawOnChartArea: false,
+                        color: 'rgba(255, 255, 255, 0.1)',
+                        lineWidth: 0.5
+                    },
+                }
+            }
+        }
+    });
+}
+
+// Utility functions
+function showLoading(show) {
+    document.getElementById('loadingSpinner').style.display = show ? 'block' : 'none';
+}
+
+function showError(message) {
+    document.getElementById('errorText').textContent = message;
+    document.getElementById('errorMessage').style.display = 'block';
+    setTimeout(() => {
+        document.getElementById('errorMessage').style.display = 'none';
+    }, 5000);
+}
+
+function resetFilters() {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('target_date').value = today;
+    document.getElementById('start_time').value = '09:15';
+    document.getElementById('end_time').value = '15:30';
+    document.getElementById('underlying').value = 'NIFTY';
+    
+    loadSummaryData();
+    loadChartData();
+}
+
+// Initialize default values
+function initializeDateTimePickers() {
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Set default values if not already set
+    if (!document.getElementById('target_date').value) {
+        document.getElementById('target_date').value = today;
+    }
+}
+</script>
+{% endblock %}

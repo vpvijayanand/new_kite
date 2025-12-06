@@ -29,13 +29,25 @@ def oi_changes_timeline_api():
         from sqlalchemy import func
         from datetime import datetime, timedelta, time
         from flask import request
+        from app.services.datetime_filter_service import DateTimeFilterService
         
         # Get underlying parameter (default to NIFTY)
         underlying = request.args.get('underlying', 'NIFTY').upper()
         
-        # Get today's market hours: 9:20 AM to 15:30 IST and convert to UTC
+        # Initialize date filter service
+        date_filter = DateTimeFilterService()
+        
+        # Parse date/time parameters with today as default
+        start_date, end_date, start_time, end_time = date_filter.parse_date_params(
+            request.args, default_today=True
+        )
+        
+        # Use the filter service to get the target date
+        target_date = DateTimeFilterService.get_target_date(start_date, end_date)
+        
+        # Get market hours for the target date: 9:20 AM to 15:30 IST and convert to UTC
         from datetime import timezone, timedelta
-        today = datetime.now().date()
+        today = target_date
         
         # Create IST timezone
         ist_timezone = timezone(timedelta(hours=5, minutes=30))

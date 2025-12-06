@@ -34,6 +34,9 @@
 {% endblock %}
 
 {% block content %}
+<!-- Date Filter Component -->
+{% include 'components/datetime_filter.html' %}
+
 <div class="container-fluid">
     <div class="row mb-3">
         <div class="col-md-12">
@@ -420,7 +423,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function getCurrentPrice() {
         // This would be updated with real current price from the API
-        return underlying === 'NIFTY' ? 24000 : 52000; // Placeholder
+        // Using current market values instead of hardcoded ones
+        return underlying === 'NIFTY' ? 26135 : 59606; // Updated to current market levels
     }
 });
 

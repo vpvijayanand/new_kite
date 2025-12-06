@@ -138,8 +138,8 @@ class MarketService:
                 'banknifty_options_summary': []
             }
 
-    def _get_price_with_daily_change(self, underlying):
-        """Get latest price with calculated daily percentage change"""
+    def _get_price_with_daily_change(self, underlying, target_date=None):
+        """Get latest price with calculated daily percentage change for specific date"""
         try:
             from datetime import date, datetime
             from sqlalchemy import func
@@ -149,21 +149,24 @@ class MarketService:
             else:
                 model = BankNiftyPrice
             
-            # Get today's date
-            today = date.today()
-            print(f"DEBUG: Getting {underlying} price for date: {today}")
+            # Use provided date or default to today
+            target_date = target_date or date.today()
+            print(f"DEBUG: Getting {underlying} price for date: {target_date}")
             
-            # Get latest price
-            latest_price = model.query.order_by(model.timestamp.desc()).first()
+            # Get latest price for the target date
+            latest_price = model.query.filter(
+                func.date(model.timestamp) == target_date
+            ).order_by(model.timestamp.desc()).first()
+            
             if not latest_price:
-                print(f"DEBUG: No {underlying} price data found at all")
+                print(f"DEBUG: No {underlying} price data found for {target_date}")
                 return None
             
             print(f"DEBUG: Latest {underlying} price: {latest_price.price} at {latest_price.timestamp}")
             
             # Get first price of the day (market opening around 9:20 AM)
             first_price_today = model.query.filter(
-                func.date(model.timestamp) == today
+                func.date(model.timestamp) == target_date
             ).order_by(model.timestamp.asc()).first()
             
             if not first_price_today:
@@ -198,12 +201,15 @@ class MarketService:
             print(f"Error calculating daily change for {underlying}: {str(e)}")
             return None
 
-    def get_comprehensive_dashboard_data(self):
-        """Get comprehensive dashboard data for new dashboard"""
+    def get_comprehensive_dashboard_data(self, start_date=None, end_date=None, start_time=None, end_time=None):
+        """Get comprehensive dashboard data for new dashboard with date filtering"""
         try:
-            # Get latest prices with daily change calculation
-            nifty_price = self._get_price_with_daily_change('NIFTY')
-            banknifty_price = self._get_price_with_daily_change('BANKNIFTY')
+            # Use end_date for getting the latest prices on that specific day
+            target_date = end_date.date() if end_date else None
+            
+            # Get latest prices with daily change calculation for the target date
+            nifty_price = self._get_price_with_daily_change('NIFTY', target_date)
+            banknifty_price = self._get_price_with_daily_change('BANKNIFTY', target_date)
             
             # Get NIFTY 50 stocks data
             from app.models.nifty_stocks import NiftyStock
@@ -499,7 +505,7 @@ class MarketService:
             print(f"Error calculating sector performance: {str(e)}")
             return []
 
-    def get_market_signal_analysis(self):
+    def get_market_signal_analysis(self, target_date=None):
         """
         Simple NIFTY-based signal analysis - Step by step implementation
         Returns signal strength from -100 (Strong Sell) to +100 (Strong Buy)
@@ -510,7 +516,7 @@ class MarketService:
             calculation_breakdown = {}
             
             # STEP 1: NIFTY Price Change Analysis (50% weight)
-            nifty_price_data = self._get_price_with_daily_change('NIFTY')
+            nifty_price_data = self._get_price_with_daily_change('NIFTY', target_date=target_date)
             nifty_score = 0
             nifty_change = 0
             
@@ -534,7 +540,7 @@ class MarketService:
                 }
             
             # STEP 2: BANKNIFTY Price Change Analysis (50% weight)
-            banknifty_price_data = self._get_price_with_daily_change('BANKNIFTY')
+            banknifty_price_data = self._get_price_with_daily_change('BANKNIFTY', target_date=target_date)
             banknifty_score = 0
             banknifty_change = 0
             
@@ -558,7 +564,7 @@ class MarketService:
                 }
             
             # STEP 3: NIFTY OI Analysis (25% weight)
-            nifty_oi_data = self._analyze_oi_change('NIFTY')
+            nifty_oi_data = self._analyze_oi_change('NIFTY', target_date=target_date)
             nifty_oi_score = nifty_oi_data['score']
             
             signal_details['nifty_oi'] = nifty_oi_data
@@ -576,7 +582,7 @@ class MarketService:
             }
             
             # STEP 4: BANKNIFTY OI Analysis (25% weight)
-            banknifty_oi_data = self._analyze_oi_change('BANKNIFTY')
+            banknifty_oi_data = self._analyze_oi_change('BANKNIFTY', target_date=target_date)
             banknifty_oi_score = banknifty_oi_data['score']
             
             signal_details['banknifty_oi'] = banknifty_oi_data
@@ -594,7 +600,7 @@ class MarketService:
             }
             
             # STEP 5: Net Influence Analysis (NIFTY 50 stocks impact)
-            influence_data = self.get_comprehensive_dashboard_data()
+            influence_data = self.get_comprehensive_dashboard_data(start_date=target_date, end_date=target_date)
             influence_score = 0
             net_influence = 0
             
@@ -773,15 +779,15 @@ class MarketService:
         except:
             return 0
     
-    def _analyze_oi_change(self, underlying='NIFTY'):
+    def _analyze_oi_change(self, underlying='NIFTY', target_date=None):
         """Analyze OI changes to determine market sentiment for given underlying"""
         try:
             from app.models.banknifty_price import OptionChainData
             from datetime import datetime, timedelta, date
             from sqlalchemy import func
             
-            # Get current day data only (from 00:00:00 today)
-            today = date.today()
+            # Get target day data only (from 00:00:00 target date)
+            today = target_date or date.today()
             today_start = datetime.combine(today, datetime.min.time())
             
             print(f"DEBUG: Analyzing {underlying} OI changes for today: {today}")

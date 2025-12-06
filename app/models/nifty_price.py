@@ -7,6 +7,10 @@ class NiftyPrice(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     symbol = db.Column(db.String(50), nullable=False, default='NIFTY 50')
     price = db.Column(db.Float, nullable=False)
+    high = db.Column(db.Float, nullable=True)  # High price for the period
+    low = db.Column(db.Float, nullable=True)   # Low price for the period
+    open = db.Column(db.Float, nullable=True)  # Open price for the period
+    close = db.Column(db.Float, nullable=True) # Close price for the period
     change = db.Column(db.Float)
     change_percent = db.Column(db.Float)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
@@ -19,6 +23,10 @@ class NiftyPrice(db.Model):
             'id': self.id,
             'symbol': self.symbol,
             'price': self.price,
+            'high': self.high,
+            'low': self.low,
+            'open': self.open,
+            'close': self.close,
             'change': self.change,
             'change_percent': self.change_percent,
             'timestamp': self.timestamp.strftime('%Y-%m-%d %H:%M:%S')
@@ -41,6 +49,10 @@ class NiftyPrice(db.Model):
         new_price = cls(
             symbol=price_data.get('symbol', 'NIFTY 50'),
             price=price_data['price'],
+            high=price_data.get('high', price_data['price']),  # Use price if high not provided
+            low=price_data.get('low', price_data['price']),    # Use price if low not provided
+            open=price_data.get('open', price_data['price']),  # Use price if open not provided
+            close=price_data.get('close', price_data['price']), # Use price if close not provided
             change=price_data.get('change'),
             change_percent=price_data.get('change_percent')
         )

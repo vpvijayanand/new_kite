@@ -5,70 +5,87 @@
 {% block extra_css %}
 <style>
 .strategy-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
+    background: linear-gradient(135deg, var(--kite-accent) 0%, #8F0D52 100%);
+    color: var(--kite-text-main);
     padding: 2rem;
     border-radius: 15px;
     margin-bottom: 2rem;
+    border: 1px solid var(--kite-border);
 }
 
 .info-card {
-    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-    border: none;
+    background: linear-gradient(135deg, var(--kite-info) 0%, #0B5ED7 100%);
+    border: 1px solid var(--kite-border);
     border-radius: 10px;
-    color: white;
+    color: var(--kite-text-main);
 }
 
 .data-card {
-    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-    border: none;
+    background: linear-gradient(135deg, var(--kite-secondary) 0%, #0AA1DD 100%);
+    border: 1px solid var(--kite-border);
     border-radius: 10px;
-    color: white;
+    color: var(--kite-text-main);
 }
 
 .pnl-positive {
-    color: #28a745;
+    color: var(--kite-success);
     font-weight: bold;
     text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
 }
 
 .pnl-negative {
-    color: #dc3545;
+    color: var(--kite-danger);
     font-weight: bold;
     text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
 }
 
 .status-monitoring {
-    color: #ffc107;
+    color: var(--kite-warning);
     font-weight: bold;
     text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
 }
 
 .status-triggered {
-    color: #28a745;
+    color: var(--kite-success);
     font-weight: bold;
     text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
 }
 
 .status-closed {
-    color: #6c757d;
+    color: var(--kite-text-muted);
     font-weight: bold;
     text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
 }
 
 .table-dark-custom {
-    background-color: rgba(0,0,0,0.7);
-    color: white;
+    background-color: var(--kite-card-bg);
+    color: var(--kite-text-main);
 }
 
 .table-dark-custom th {
-    background-color: rgba(0,0,0,0.9);
-    border-color: #495057;
+    background-color: var(--kite-border);
+    border-color: var(--kite-border);
+    color: var(--kite-text-main);
+}
+
+.table-dark-custom td {
+    border-color: var(--kite-border);
 }
 
 .history-table {
-    max-height: 400px;
+    max-height: 500px;
     overflow-y: auto;
+}
+
+.table-sm td {
+    padding: 0.3rem;
+    font-size: 0.85rem;
+}
+
+.table-sm th {
+    padding: 0.5rem 0.3rem;
+    font-size: 0.8rem;
+    font-weight: 600;
 }
 
 .trigger-indicator {
@@ -80,15 +97,29 @@
 }
 
 .trigger-low {
-    background-color: #ff4757;
+    background-color: var(--kite-danger);
 }
 
 .trigger-high {
-    background-color: #00ff88;
+    background-color: var(--kite-success);
 }
 
 .trigger-none {
-    background-color: #a4b0be;
+    background-color: var(--kite-text-muted);
+}
+
+.position-card {
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.pnl-card {
+    background: linear-gradient(135deg, var(--kite-card-bg) 0%, #0F1419 100%);
+}
+
+.formula-text {
+    font-size: 0.75rem;
+    opacity: 0.8;
 }
 </style>
 {% endblock %}
@@ -98,7 +129,7 @@
     <!-- Strategy Header -->
     <div class="strategy-header text-center">
         <div class="d-flex justify-content-between align-items-center">
-            <a href="{{ url_for('strategy.strategies_dashboard') }}" class="btn btn-outline-light">
+            <a href="{{ url_for('strategy.strategies_dashboard') }}" class="btn btn-outline-primary">
                 <i class="fas fa-arrow-left me-2"></i>Back to Strategies
             </a>
             <div>
@@ -108,9 +139,17 @@
                 <p class="lead mb-0">NIFTY High-Low Breakout Strategy</p>
                 <small>Range: 9:12 AM - 9:33 AM | Execution: 9:30 AM - 3:15 PM</small>
             </div>
-            <button class="btn btn-light" onclick="refreshData()" id="refreshBtn">
-                <i class="fas fa-sync-alt me-2"></i>Refresh
-            </button>
+            <div>
+                <button class="btn btn-outline-info me-2" onclick="showCompleteHistory()" id="historyBtn">
+                    <i class="fas fa-history me-2"></i>Complete History
+                </button>
+                <button class="btn btn-outline-secondary me-2" onclick="testPnLCalculation()" id="testBtn">
+                    <i class="fas fa-calculator me-2"></i>Test P&L
+                </button>
+                <button class="btn btn-outline-primary" onclick="refreshData()" id="refreshBtn">
+                    <i class="fas fa-sync-alt me-2"></i>Refresh
+                </button>
+            </div>
         </div>
     </div>
 
@@ -123,19 +162,23 @@
                     <h5 class="card-title">
                         <i class="fas fa-chart-line me-2"></i>NIFTY Current
                     </h5>
-                    <h2 id="currentPrice">₹---.--</h2>
+                    <h2 id="currentPrice">---.--</h2>
                     <small id="priceTime">--:--</small>
                 </div>
             </div>
         </div>
 
         <!-- Strategy Range -->
-        <div class="col-lg-3 col-md-6 mb-3">
+        <div class="col-lg-4 col-md-6 mb-3">
             <div class="card data-card text-white h-100">
                 <div class="card-body text-center">
                     <h5 class="card-title">
-                        <i class="fas fa-arrows-alt-v me-2"></i>Today's Range
+                        <i class="fas fa-arrows-alt-v me-2"></i>Strategy Range (9:12-9:33)
                     </h5>
+                    <div class="mb-2">
+                        <small><strong>9:12 AM:</strong> <span id="price912">---.--</span></small><br>
+                        <small><strong>9:33 AM:</strong> <span id="price933">---.--</span></small>
+                    </div>
                     <div>
                         <strong>High:</strong> <span id="strategyHigh">---.--</span><br>
                         <strong>Low:</strong> <span id="strategyLow">---.--</span><br>
@@ -146,11 +189,11 @@
         </div>
 
         <!-- Position Status -->
-        <div class="col-lg-3 col-md-6 mb-3">
+        <div class="col-lg-2 col-md-6 mb-3">
             <div class="card info-card text-white h-100">
                 <div class="card-body text-center">
                     <h5 class="card-title">
-                        <i class="fas fa-flag me-2"></i>Position Status
+                        <i class="fas fa-flag me-2"></i>Status
                     </h5>
                     <h3 id="positionStatus" class="status-monitoring">Monitoring</h3>
                     <small id="triggerType">Waiting for breakout</small>
@@ -165,29 +208,168 @@
                     <h5 class="card-title">
                         <i class="fas fa-rupee-sign me-2"></i>P&L Summary
                     </h5>
-                    <h2 id="totalPnL">₹0.00</h2>
+                    <h2 id="totalPnL">0.00</h2>
                     <small><span id="pnlPercentage">0.00%</span> of capital</small>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Position Details -->
-    <div class="row mb-4">
+
+
+    <!-- Detailed P&L Breakdown (shown when positions exist) -->
+    <div class="row mb-4" id="pnlBreakdownSection" style="display: none;">
         <div class="col-12">
-            <div class="card bg-dark text-white">
-                <div class="card-header">
-                    <h5 class="mb-0">
-                        <i class="fas fa-list me-2"></i>Current Positions
-                        <span class="badge bg-info ms-2" id="positionCount">0 Positions</span>
+            <div class="card bg-kite-card text-kite-main border-kite">
+                <div class="card-header" style="background-color: var(--kite-border);">
+                    <h5 class="mb-0 text-kite-main">
+                        <i class="fas fa-calculator me-2"></i>Detailed P&L Breakdown
                     </h5>
                 </div>
                 <div class="card-body">
-                    <div class="row" id="positionsContainer">
-                        <div class="col-12 text-center text-muted">
-                            <i class="fas fa-clock fa-2x mb-2"></i>
-                            <p>No positions yet. Waiting for breakout...</p>
+                    <div class="row">
+                        <!-- Sell Position -->
+                        <div class="col-md-4">
+                            <div class="card bg-secondary mb-3">
+                                <div class="card-header bg-danger text-white">
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-arrow-down me-2"></i>SELL Position
+                                        <span id="sellStrikeDisplay">-</span>
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <table class="table table-sm table-dark mb-0">
+                                        <tr>
+                                            <td>Entry LTP:</td>
+                                            <td class="text-end" id="sellEntryLTP">-</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Current LTP:</td>
+                                            <td class="text-end" id="sellCurrentLTP">-</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Quantity:</td>
+                                            <td class="text-end" id="sellQuantity">225</td>
+                                        </tr>
+                                        <tr class="border-top">
+                                            <td><strong>P&L:</strong></td>
+                                            <td class="text-end"><strong id="sellPnL">-</strong></td>
+                                        </tr>
+                                    </table>
+                                    <small class="text-muted">Formula: (Entry - Current) × Qty</small>
+                                </div>
+                            </div>
                         </div>
+
+                        <!-- Buy Position -->
+                        <div class="col-md-4">
+                            <div class="card bg-secondary mb-3">
+                                <div class="card-header bg-success text-white">
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-arrow-up me-2"></i>BUY Position
+                                        <span id="buyStrikeDisplay">-</span>
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <table class="table table-sm table-dark mb-0">
+                                        <tr>
+                                            <td>Entry LTP:</td>
+                                            <td class="text-end" id="buyEntryLTP">-</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Current LTP:</td>
+                                            <td class="text-end" id="buyCurrentLTP">-</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Quantity:</td>
+                                            <td class="text-end" id="buyQuantity">225</td>
+                                        </tr>
+                                        <tr class="border-top">
+                                            <td><strong>P&L:</strong></td>
+                                            <td class="text-end"><strong id="buyPnL">-</strong></td>
+                                        </tr>
+                                    </table>
+                                    <small class="text-muted">Formula: (Current - Entry) × Qty</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Total Summary -->
+                        <div class="col-md-4">
+                            <div class="card bg-secondary mb-3">
+                                <div class="card-header bg-primary text-white">
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-chart-line me-2"></i>Net Position
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <table class="table table-sm table-dark mb-0">
+                                        <tr>
+                                            <td>Entry Credit:</td>
+                                            <td class="text-end" id="entryCredit">-</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Current Credit:</td>
+                                            <td class="text-end" id="currentCredit">-</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Capital Used:</td>
+                                            <td class="text-end" id="capitalUsed">-</td>
+                                        </tr>
+                                        <tr class="border-top">
+                                            <td><strong>Total P&L:</strong></td>
+                                            <td class="text-end"><strong id="totalPnLDetailed">-</strong></td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Return %:</strong></td>
+                                            <td class="text-end"><strong id="returnPercent">-</strong></td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Minute-by-Minute History -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card bg-dark text-white">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-history me-2"></i>Minute-by-Minute History
+                    </h5>
+                    <small id="historyCount">0 records</small>
+                </div>
+                <div class="card-body p-0">
+                    <div class="history-table">
+                        <table class="table table-dark-custom table-hover mb-0 table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>NIFTY</th>
+                                    <th>Status</th>
+                                    <th>Strikes</th>
+                                    <th>Sell LTP</th>
+                                    <th>Buy LTP</th>
+                                    <th>Sell P&L</th>
+                                    <th>Buy P&L</th>
+                                    <th>Total P&L</th>
+                                    <th>Return %</th>
+                                    <th>Details</th>
+                                </tr>
+                            </thead>
+                            <tbody id="historyTableBody">
+                                <tr>
+                                    <td colspan="11" class="text-center text-muted py-4">
+                                        <i class="fas fa-spinner fa-spin me-2"></i>Loading history...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -197,9 +379,9 @@
     <!-- Strategy Parameters -->
     <div class="row mb-4">
         <div class="col-lg-6 mb-3">
-            <div class="card bg-dark text-white">
-                <div class="card-header">
-                    <h5 class="mb-0">
+            <div class="card bg-kite-card text-kite-main border-kite">
+                <div class="card-header" style="background-color: var(--kite-border);">
+                    <h5 class="mb-0 text-kite-main">
                         <i class="fas fa-cog me-2"></i>Strategy Parameters
                     </h5>
                 </div>
@@ -275,47 +457,14 @@
                             • Monitor every minute during market hours
                         </small>
                     </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Minute-by-Minute History -->
-    <div class="row">
-        <div class="col-12">
-            <div class="card bg-dark text-white">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">
-                        <i class="fas fa-history me-2"></i>Minute-by-Minute History
-                    </h5>
-                    <small id="historyCount">0 records</small>
-                </div>
-                <div class="card-body p-0">
-                    <div class="history-table">
-                        <table class="table table-dark-custom table-hover mb-0">
-                            <thead>
-                                <tr>
-                                    <th>Time</th>
-                                    <th>NIFTY Price</th>
-                                    <th>Status</th>
-                                    <th>Sell Strike</th>
-                                    <th>Buy Strike</th>
-                                    <th>Sell LTP</th>
-                                    <th>Buy LTP</th>
-                                    <th>Net Premium</th>
-                                    <th>P&L</th>
-                                    <th>Capital</th>
-                                    <th>Return %</th>
-                                </tr>
-                            </thead>
-                            <tbody id="historyTableBody">
-                                <tr>
-                                    <td colspan="11" class="text-center text-muted py-4">
-                                        <i class="fas fa-spinner fa-spin me-2"></i>Loading history...
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+                    <div class="mb-3">
+                        <h6 class="text-info">💰 P&L Calculation:</h6>
+                        <small>
+                            <strong>SELL P&L:</strong> Entry LTP - Current LTP<br>
+                            <strong>BUY P&L:</strong> Current LTP - Entry LTP<br>
+                            <strong>Total P&L:</strong> Sell P&L + Buy P&L × Quantity<br>
+                            <em>Example: Sell @200, now @190 = +10 profit per share</em>
+                        </small>
                     </div>
                 </div>
             </div>
@@ -358,9 +507,8 @@ async function refreshStatus() {
         
         // Update current price
         if (data.current_price) {
-            document.getElementById('currentPrice').textContent = `₹${data.current_price.price.toFixed(2)}`;
-            const timestamp = new Date(data.current_price.timestamp);
-            document.getElementById('priceTime').textContent = timestamp.toLocaleTimeString();
+            document.getElementById('currentPrice').textContent = `${data.current_price.price.toFixed(2)}`;
+            document.getElementById('priceTime').textContent = convertToIST(data.current_price.timestamp);
         }
         
         // Update strategy range
@@ -368,6 +516,14 @@ async function refreshStatus() {
             document.getElementById('strategyHigh').textContent = data.range_data.high.toFixed(2);
             document.getElementById('strategyLow').textContent = data.range_data.low.toFixed(2);
             document.getElementById('rangeSize').textContent = data.range_data.range.toFixed(2);
+            
+            // Update 9:12 and 9:33 prices if available
+            if (data.range_data.price_912) {
+                document.getElementById('price912').textContent = data.range_data.price_912.toFixed(2);
+            }
+            if (data.range_data.price_933) {
+                document.getElementById('price933').textContent = data.range_data.price_933.toFixed(2);
+            }
         }
         
         // Update position status
@@ -421,7 +577,7 @@ async function refreshStatus() {
         // Update P&L
         const pnl = positions.current_pnl || 0;
         const pnlClass = pnl >= 0 ? 'pnl-positive' : 'pnl-negative';
-        document.getElementById('totalPnL').innerHTML = `<span class="${pnlClass}">₹${pnl.toFixed(2)}</span>`;
+        document.getElementById('totalPnL').innerHTML = `<span class="${pnlClass}">${pnl.toFixed(2)}</span>`;
         
         const pnlPercentage = data.pnl_percentage || 0;
         document.getElementById('pnlPercentage').innerHTML = `<span class="${pnlClass}">${pnlPercentage.toFixed(2)}%</span>`;
@@ -434,11 +590,13 @@ async function refreshStatus() {
 // Update positions display
 function updatePositionsDisplay(positions) {
     const container = document.getElementById('positionsContainer');
+    const breakdownSection = document.getElementById('pnlBreakdownSection');
     
     if (positions.triggered) {
-        const optionType = positions.trigger_type === 'LOW_BREAK' ? 'CE' : 'PE';
+        const optionType = positions.option_type || (positions.trigger_type === 'LOW_BREAK' ? 'CE' : 'PE');
         const spreadType = positions.trigger_type === 'LOW_BREAK' ? 'Bear Call Spread' : 'Bull Put Spread';
         
+        // Update basic positions display
         container.innerHTML = `
             <div class="col-md-6">
                 <div class="card bg-secondary mb-2">
@@ -448,8 +606,8 @@ function updatePositionsDisplay(positions) {
                             ${positions.sell_strike} ${optionType}
                         </h6>
                         <div class="d-flex justify-content-between">
-                            <small>LTP: ₹${positions.sell_ltp.toFixed(2)}</small>
-                            <small>Qty: 225</small>
+                            <small>LTP: ${positions.sell_ltp.toFixed(2)} (Entry: ${(positions.sell_ltp_entry || 0).toFixed(2)})</small>
+                            <small>Qty: ${positions.total_quantity || 225}</small>
                         </div>
                     </div>
                 </div>
@@ -462,8 +620,8 @@ function updatePositionsDisplay(positions) {
                             ${positions.buy_strike} ${optionType}
                         </h6>
                         <div class="d-flex justify-content-between">
-                            <small>LTP: ₹${positions.buy_ltp.toFixed(2)}</small>
-                            <small>Qty: 225</small>
+                            <small>LTP: ${positions.buy_ltp.toFixed(2)} (Entry: ${(positions.buy_ltp_entry || 0).toFixed(2)})</small>
+                            <small>Qty: ${positions.total_quantity || 225}</small>
                         </div>
                     </div>
                 </div>
@@ -472,12 +630,17 @@ function updatePositionsDisplay(positions) {
                 <div class="alert alert-info py-2 mb-0">
                     <small>
                         <strong>${spreadType}</strong> - 
-                        Net Premium: ₹${positions.net_premium.toFixed(2)} | 
-                        Capital Used: ₹${positions.capital_used.toFixed(0)}
+                        Net Credit: ${(positions.net_premium || 0).toFixed(2)} (Entry: ${(positions.net_premium_entry || 0).toFixed(2)}) | 
+                        Capital Used: ${(positions.capital_used || 0).toFixed(0)}
                     </small>
                 </div>
             </div>
         `;
+        
+        // Show and update detailed P&L breakdown
+        breakdownSection.style.display = 'block';
+        updateDetailedPnLBreakdown(positions);
+        
     } else {
         container.innerHTML = `
             <div class="col-12 text-center text-muted">
@@ -485,13 +648,55 @@ function updatePositionsDisplay(positions) {
                 <p>No positions yet. Waiting for breakout...</p>
             </div>
         `;
+        
+        // Hide detailed breakdown
+        breakdownSection.style.display = 'none';
     }
 }
 
-// Refresh history data
+// Update detailed P&L breakdown
+function updateDetailedPnLBreakdown(positions) {
+    const optionType = positions.option_type || (positions.trigger_type === 'LOW_BREAK' ? 'CE' : 'PE');
+    
+    // Sell position details
+    document.getElementById('sellStrikeDisplay').textContent = `${positions.sell_strike} ${optionType}`;
+    document.getElementById('sellEntryLTP').textContent = (positions.sell_ltp_entry || 0).toFixed(2);
+    document.getElementById('sellCurrentLTP').textContent = (positions.sell_ltp || 0).toFixed(2);
+    document.getElementById('sellQuantity').textContent = positions.total_quantity || 225;
+    
+    const sellPnL = positions.sell_pnl || 0;
+    const sellPnLClass = sellPnL >= 0 ? 'pnl-positive' : 'pnl-negative';
+    document.getElementById('sellPnL').innerHTML = `<span class="${sellPnLClass}">${sellPnL.toFixed(0)}</span>`;
+    
+    // Buy position details
+    document.getElementById('buyStrikeDisplay').textContent = `${positions.buy_strike} ${optionType}`;
+    document.getElementById('buyEntryLTP').textContent = (positions.buy_ltp_entry || 0).toFixed(2);
+    document.getElementById('buyCurrentLTP').textContent = (positions.buy_ltp || 0).toFixed(2);
+    document.getElementById('buyQuantity').textContent = positions.total_quantity || 225;
+    
+    const buyPnL = positions.buy_pnl || 0;
+    const buyPnLClass = buyPnL >= 0 ? 'pnl-positive' : 'pnl-negative';
+    document.getElementById('buyPnL').innerHTML = `<span class="${buyPnLClass}">${buyPnL.toFixed(0)}</span>`;
+    
+    // Net position details
+    document.getElementById('entryCredit').textContent = (positions.net_premium_entry || 0).toFixed(2);
+    document.getElementById('currentCredit').textContent = (positions.net_premium || 0).toFixed(2);
+    document.getElementById('capitalUsed').textContent = (positions.capital_used || 0).toFixed(0);
+    
+    const totalPnL = positions.current_pnl || 0;
+    const totalPnLClass = totalPnL >= 0 ? 'pnl-positive' : 'pnl-negative';
+    document.getElementById('totalPnLDetailed').innerHTML = `<span class="${totalPnLClass}">${totalPnL.toFixed(0)}</span>`;
+    
+    const returnPercent = ((positions.capital_used || 0) > 0) ? 
+        ((totalPnL / positions.capital_used) * 100) : 0;
+    const returnPercentClass = returnPercent >= 0 ? 'pnl-positive' : 'pnl-negative';
+    document.getElementById('returnPercent').innerHTML = `<span class="${returnPercentClass}">${returnPercent.toFixed(2)}%</span>`;
+}
+
+// Refresh history data (showing last 20 records for performance)
 async function refreshHistory() {
     try {
-        const response = await fetch('/strategies/api/strategy-1/history');
+        const response = await fetch('/strategies/api/strategy-1/complete-history');
         const data = await response.json();
         
         if (data.error) {
@@ -500,9 +705,9 @@ async function refreshHistory() {
         }
         
         const tbody = document.getElementById('historyTableBody');
-        document.getElementById('historyCount').textContent = `${data.total_records || 0} records`;
+        document.getElementById('historyCount').textContent = `${data.total_records || 0} records (showing recent 20)`;
         
-        if (!data.history || data.history.length === 0) {
+        if (!data.timeline || data.timeline.length === 0) {
             tbody.innerHTML = `
                 <tr>
                     <td colspan="11" class="text-center text-muted py-4">
@@ -513,31 +718,59 @@ async function refreshHistory() {
             return;
         }
         
-        // Build history table
+        // Show last 20 records for performance (use "Complete History" button for all)
+        const recentRecords = data.timeline.slice(-20).reverse();
+        
+        // Build enhanced history table with detailed P&L breakdown
         let html = '';
-        data.history.forEach(record => {
-            const triggerClass = record.triggered ? 
-                (record.trigger_type === 'LOW_BREAK' ? 'trigger-low' : 'trigger-high') : 'trigger-none';
-            
-            const pnlClass = record.current_pnl >= 0 ? 'pnl-positive' : 'pnl-negative';
+        recentRecords.forEach(record => {
+            const statusClass = getStatusClass(record.status);
+            const totalPnlClass = record.total_pnl >= 0 ? 'pnl-positive' : 'pnl-negative';
+            const sellPnlClass = (record.sell_pnl || 0) >= 0 ? 'pnl-positive' : 'pnl-negative';
+            const buyPnlClass = (record.buy_pnl || 0) >= 0 ? 'pnl-positive' : 'pnl-negative';
             const returnClass = record.pnl_percentage >= 0 ? 'pnl-positive' : 'pnl-negative';
             
+            // Format strikes display
+            const strikesDisplay = record.sell_strike && record.buy_strike 
+                ? `${record.sell_strike}/${record.buy_strike} ${record.option_type || 'CE'}` 
+                : '-';
+            
+            // Format status with option type
+            const statusDisplay = record.triggered 
+                ? `${record.trigger_type === 'LOW_BREAK' ? 'Bear' : 'Bull'} ${record.option_type || 'CE'}`
+                : record.status;
+            
+            // Format LTP with entry comparison  
+            const sellLtpDisplay = record.sell_ltp_current 
+                ? `${record.sell_ltp_current.toFixed(2)}${record.sell_ltp_entry ? ` (${record.sell_ltp_entry.toFixed(2)})` : ''}`
+                : '-';
+            const buyLtpDisplay = record.buy_ltp_current 
+                ? `${record.buy_ltp_current.toFixed(2)}${record.buy_ltp_entry ? ` (${record.buy_ltp_entry.toFixed(2)})` : ''}`
+                : '-';
+            
+            const statusIcon = getStatusIcon(record.status);
+            
             html += `
-                <tr>
-                    <td>${record.timestamp}</td>
-                    <td>₹${record.nifty_price.toFixed(2)}</td>
+                <tr class="${record.status === 'TRIGGER_POINT' ? 'table-warning' : ''}">
+                    <td>${convertToIST(record.timestamp)}</td>
+                    <td>${record.nifty_price.toFixed(2)}</td>
                     <td>
-                        <span class="trigger-indicator ${triggerClass}"></span>
-                        ${record.triggered ? (record.trigger_type === 'LOW_BREAK' ? 'Low Break' : 'High Break') : 'Monitoring'}
+                        <span class="${statusClass}">${statusIcon}</span>
+                        <small>${statusDisplay}</small>
                     </td>
-                    <td>${record.sell_strike || '-'}</td>
-                    <td>${record.buy_strike || '-'}</td>
-                    <td>${record.sell_ltp ? '₹' + record.sell_ltp.toFixed(2) : '-'}</td>
-                    <td>${record.buy_ltp ? '₹' + record.buy_ltp.toFixed(2) : '-'}</td>
-                    <td>${record.net_premium ? '₹' + record.net_premium.toFixed(2) : '-'}</td>
-                    <td><span class="${pnlClass}">₹${record.current_pnl.toFixed(2)}</span></td>
-                    <td>₹${record.capital_used.toFixed(0)}</td>
-                    <td><span class="${returnClass}">${record.pnl_percentage.toFixed(2)}%</span></td>
+                    <td><small>${strikesDisplay}</small></td>
+                    <td><small>${sellLtpDisplay}</small></td>
+                    <td><small>${buyLtpDisplay}</small></td>
+                    <td><small><span class="${sellPnlClass}">${(record.sell_pnl || 0).toFixed(0)}</span></small></td>
+                    <td><small><span class="${buyPnlClass}">${(record.buy_pnl || 0).toFixed(0)}</span></small></td>
+                    <td><span class="${totalPnlClass}"><strong>${(record.total_pnl || 0).toFixed(0)}</strong></span></td>
+                    <td><span class="${returnClass}"><strong>${(record.pnl_percentage || 0).toFixed(2)}%</strong></span></td>
+                    <td>
+                        ${record.triggered ? 
+                            `<small>Cap: ${(record.capital_used || 0).toFixed(0)}<br>
+                             Net: ${(record.net_premium_current || 0).toFixed(2)}</small>` 
+                            : '<small>-</small>'}
+                    </td>
                 </tr>
             `;
         });
@@ -549,6 +782,42 @@ async function refreshHistory() {
     }
 }
 
+// Simple IST conversion function
+function convertToIST(timestamp) {
+    if (!timestamp) return '--:--:--';
+    
+    try {
+        // If it's already a time string (HH:MM:SS), return as-is
+        if (typeof timestamp === 'string' && timestamp.match(/^\d{2}:\d{2}:\d{2}$/)) {
+            return timestamp;
+        }
+        
+        // Convert any timestamp to IST
+        const date = new Date(timestamp);
+        
+        // Check if valid date
+        if (isNaN(date.getTime())) {
+            console.warn('Invalid timestamp:', timestamp);
+            return '--:--:--';
+        }
+        
+        // Force conversion to IST timezone
+        const options = {
+            timeZone: 'Asia/Kolkata',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        };
+        
+        return new Intl.DateTimeFormat('en-GB', options).format(date);
+        
+    } catch (error) {
+        console.error('Error converting to IST:', timestamp, error);
+        return '--:--:--';
+    }
+}
+
 // Initialize page
 document.addEventListener('DOMContentLoaded', function() {
     // Initial load
@@ -557,6 +826,305 @@ document.addEventListener('DOMContentLoaded', function() {
     // Auto-refresh every 30 seconds
     refreshInterval = setInterval(refreshData, 30000);
 });
+
+// Show complete minute-by-minute history
+async function showCompleteHistory() {
+    const historyBtn = document.getElementById('historyBtn');
+    historyBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Loading...';
+    
+    try {
+        const response = await fetch('/strategies/api/strategy-1/complete-history');
+        const data = await response.json();
+        
+        if (data.error) {
+            alert('Error loading history: ' + data.error);
+            return;
+        }
+        
+        showCompleteHistoryModal(data);
+    } catch (error) {
+        console.error('Error loading complete history:', error);
+        alert('Error loading history: ' + error.message);
+    } finally {
+        historyBtn.innerHTML = '<i class="fas fa-history me-2"></i>Complete History';
+    }
+}
+
+// Show complete history in modal
+function showCompleteHistoryModal(data) {
+    const modalHtml = `
+        <div class="modal fade" id="completeHistoryModal" tabindex="-1" style="z-index: 1060;">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content bg-dark text-white">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="fas fa-history me-2"></i>Complete Minute-by-Minute History
+                        </h5>
+                        <div class="ms-auto me-3">
+                            <span class="badge bg-info">${data.total_records} Records</span>
+                            ${data.has_active_trade ? '<span class="badge bg-success ms-2">Active Trade</span>' : '<span class="badge bg-secondary ms-2">No Active Trade</span>'}
+                        </div>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body p-0">
+                        ${data.has_active_trade ? `
+                            <div class="alert alert-info m-3 mb-2">
+                                <strong>Active Trade:</strong> ${data.range_data.trigger_type} - 
+                                Sell ${data.range_data.sell_strike} ${data.range_data.option_type} @ ${data.range_data.sell_ltp_entry}, 
+                                Buy ${data.range_data.buy_strike} ${data.range_data.option_type} @ ${data.range_data.buy_ltp_entry} |
+                                <strong>Net Credit:</strong> ${data.range_data.net_premium_entry.toFixed(2)} |
+                                <strong>Capital:</strong> ${data.range_data.capital_used}
+                            </div>
+                        ` : ''}
+                        
+                        <div style="max-height: 70vh; overflow-y: auto;">
+                            <table class="table table-sm table-dark table-hover mb-0">
+                                <thead class="sticky-top bg-secondary">
+                                    <tr>
+                                        <th>Time</th>
+                                        <th>NIFTY</th>
+                                        <th>Status</th>
+                                        <th>Sell LTP</th>
+                                        <th>Buy LTP</th>
+                                        <th>Net Premium</th>
+                                        <th>Sell P&L</th>
+                                        <th>Buy P&L</th>
+                                        <th>Total P&L</th>
+                                        <th>Return %</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${generateHistoryTableRows(data.timeline)}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        ${data.ltp_history_count > 0 ? `
+                            <div class="mt-3 mx-3">
+                                <h6><i class="fas fa-database me-2"></i>Detailed LTP Records: ${data.ltp_history_count}</h6>
+                                <small class="text-muted">Additional tracking records from Strategy1LTPHistory table</small>
+                            </div>
+                        ` : ''}
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-info" onclick="downloadHistoryCSV()">
+                            <i class="fas fa-download me-2"></i>Download CSV
+                        </button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove existing modal if any
+    const existingModal = document.getElementById('completeHistoryModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('completeHistoryModal'));
+    modal.show();
+    
+    // Store data globally for CSV export
+    window.completeHistoryData = data;
+}
+
+// Generate table rows for history
+function generateHistoryTableRows(timeline) {
+    return timeline.map(record => {
+        const statusClass = getStatusClass(record.status);
+        const totalPnlClass = record.total_pnl >= 0 ? 'text-success' : 'text-danger';
+        const sellPnlClass = record.sell_pnl >= 0 ? 'text-success' : 'text-danger';
+        const buyPnlClass = record.buy_pnl >= 0 ? 'text-success' : 'text-danger';
+        const returnClass = record.pnl_percentage >= 0 ? 'text-success' : 'text-danger';
+        
+        const statusIcon = getStatusIcon(record.status);
+        
+        return `
+            <tr class="${record.status === 'TRIGGER_POINT' ? 'table-warning text-dark' : ''}">
+                <td class="font-monospace">${convertToIST(record.timestamp)}</td>
+                <td>${record.nifty_price.toFixed(2)}</td>
+                <td><span class="${statusClass}">${statusIcon} ${record.status}</span></td>
+                <td>${record.sell_ltp_current ? record.sell_ltp_current.toFixed(2) : '-'}</td>
+                <td>${record.buy_ltp_current ? record.buy_ltp_current.toFixed(2) : '-'}</td>
+                <td>${record.net_premium_current ? record.net_premium_current.toFixed(2) : '-'}</td>
+                <td class="${sellPnlClass}">${record.sell_pnl ? record.sell_pnl.toFixed(0) : '-'}</td>
+                <td class="${buyPnlClass}">${record.buy_pnl ? record.buy_pnl.toFixed(0) : '-'}</td>
+                <td class="${totalPnlClass}"><strong>${record.total_pnl ? record.total_pnl.toFixed(0) : '-'}</strong></td>
+                <td class="${returnClass}"><strong>${record.pnl_percentage ? record.pnl_percentage.toFixed(2) + '%' : '-'}</strong></td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// Get status class for styling
+function getStatusClass(status) {
+    switch(status) {
+        case 'MONITORING': return 'text-muted';
+        case 'TRIGGER_POINT': return 'text-warning';
+        case 'ACTIVE': return 'text-success';
+        default: return 'text-info';
+    }
+}
+
+// Get status icon
+function getStatusIcon(status) {
+    switch(status) {
+        case 'MONITORING': return '<i class="fas fa-eye"></i>';
+        case 'TRIGGER_POINT': return '<i class="fas fa-exclamation-triangle"></i>';
+        case 'ACTIVE': return '<i class="fas fa-play"></i>';
+        default: return '<i class="fas fa-info"></i>';
+    }
+}
+
+// Download history as CSV
+function downloadHistoryCSV() {
+    if (!window.completeHistoryData) return;
+    
+    const data = window.completeHistoryData;
+    let csv = 'Time,NIFTY Price,Status,Sell LTP,Buy LTP,Net Premium,Sell P&L,Buy P&L,Total P&L,Return %\\n';
+    
+    data.timeline.forEach(record => {
+        csv += [
+            record.timestamp,
+            record.nifty_price.toFixed(2),
+            record.status,
+            record.sell_ltp_current || '',
+            record.buy_ltp_current || '',
+            record.net_premium_current || '',
+            record.sell_pnl || '',
+            record.buy_pnl || '',
+            record.total_pnl || '',
+            record.pnl_percentage ? record.pnl_percentage.toFixed(2) + '%' : ''
+        ].join(',') + '\\n';
+    });
+    
+    // Create and download file
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `strategy1_history_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+}
+
+// Test P&L calculation function
+async function testPnLCalculation() {
+    const testBtn = document.getElementById('testBtn');
+    testBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Testing...';
+    
+    try {
+        const response = await fetch('/strategies/api/strategy-1/test-pnl');
+        const data = await response.json();
+        
+        if (data.success) {
+            // Show modal with test results
+            showPnLTestModal(data);
+        } else {
+            alert('Error testing P&L: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error testing P&L:', error);
+        alert('Error testing P&L: ' + error.message);
+    } finally {
+        testBtn.innerHTML = '<i class="fas fa-calculator me-2"></i>Test P&L';
+    }
+}
+
+// Show P&L test results in modal
+function showPnLTestModal(data) {
+    const modalHtml = `
+        <div class="modal fade" id="pnlTestModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content bg-dark text-white">
+                    <div class="modal-header">
+                        <h5 class="modal-title">P&L Calculation Test - ${data.example.strategy_type}</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6 class="text-info">Entry Position</h6>
+                                <table class="table table-sm table-dark">
+                                    <tr><td>Sell ${data.example.entry.sell_strike} CE:</td><td>${data.example.entry.sell_ltp}</td></tr>
+                                    <tr><td>Buy ${data.example.entry.buy_strike} CE:</td><td>${data.example.entry.buy_ltp}</td></tr>
+                                    <tr><td><strong>Net Credit:</strong></td><td><strong>${data.example.entry.net_credit}</strong></td></tr>
+                                    <tr><td>Quantity:</td><td>${data.example.entry.quantity}</td></tr>
+                                </table>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="text-warning">Current Position</h6>
+                                <table class="table table-sm table-dark">
+                                    <tr><td>Sell CE LTP:</td><td>${data.example.current.sell_ltp}</td></tr>
+                                    <tr><td>Buy CE LTP:</td><td>${data.example.current.buy_ltp}</td></tr>
+                                    <tr><td><strong>Net Credit:</strong></td><td><strong>${data.example.current.net_credit}</strong></td></tr>
+                                    <tr><td>Scenario:</td><td><em>${data.example.scenario}</em></td></tr>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <hr>
+                        
+                        <h6 class="text-success">P&L Breakdown</h6>
+                        <table class="table table-sm table-dark">
+                            <tr>
+                                <td>Sell P&L:</td>
+                                <td class="text-end"><span class="pnl-positive">+${data.example.pnl_calculation.sell_pnl}</span></td>
+                                <td><small>${data.explanation.sell_pnl}</small></td>
+                            </tr>
+                            <tr>
+                                <td>Buy P&L:</td>
+                                <td class="text-end"><span class="pnl-negative">${data.example.pnl_calculation.buy_pnl}</span></td>
+                                <td><small>${data.explanation.buy_pnl}</small></td>
+                            </tr>
+                            <tr class="border-top">
+                                <td><strong>Total P&L:</strong></td>
+                                <td class="text-end"><strong><span class="pnl-positive">+${data.example.pnl_calculation.total_pnl}</span></strong></td>
+                                <td><small>${data.explanation.total_pnl}</small></td>
+                            </tr>
+                            <tr>
+                                <td>Capital Used:</td>
+                                <td class="text-end">${data.example.pnl_calculation.capital_used}</td>
+                                <td><small>Margin requirement</small></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Return %:</strong></td>
+                                <td class="text-end"><strong><span class="pnl-positive">${data.example.pnl_calculation.return_percent.toFixed(2)}%</span></strong></td>
+                                <td><small>P&L / Capital × 100</small></td>
+                            </tr>
+                        </table>
+                        
+                        <div class="alert alert-info mt-3">
+                            <strong>Key Point:</strong> ${data.explanation.logic}
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove existing modal if any
+    const existingModal = document.getElementById('pnlTestModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('pnlTestModal'));
+    modal.show();
+}
 
 // Cleanup on page unload
 window.addEventListener('beforeunload', function() {

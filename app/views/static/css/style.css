@@ -1,17 +1,63 @@
-body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-color: #f8f9fa;
+/* Kite App Dark Theme - Core Colors */
+:root {
+    --kite-primary-bg: #191C24;
+    --kite-card-bg: #111319;
+    --kite-accent: #AF1763;
+    --kite-text-main: #F5F5F5;
+    --kite-text-muted: #A0A4B0;
+    --kite-border: #272B33;
+    --kite-info: #0D6EFD;
+    --kite-success: #198754;
+    --kite-secondary: #0DCAF0;
+    --kite-danger: #AB2E3C;
+    --kite-warning: #FFC107;
 }
 
-.navbar {
-    box-shadow: 0 2px 4px rgba(0,0,0,.1);
+body, .kite-body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--kite-primary-bg);
+    color: var(--kite-text-main);
+}
+
+.navbar, .kite-navbar {
+    background-color: var(--kite-card-bg) !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,.3);
+}
+
+.navbar-brand {
+    color: var(--kite-text-main) !important;
+    font-weight: bold;
+}
+
+.navbar-nav .nav-link {
+    color: var(--kite-text-muted) !important;
+}
+
+.navbar-nav .nav-link:hover {
+    color: var(--kite-accent) !important;
+}
+
+.dropdown-menu {
+    background-color: var(--kite-card-bg);
+    border: 1px solid var(--kite-border);
+}
+
+.dropdown-item {
+    color: var(--kite-text-muted);
+}
+
+.dropdown-item:hover {
+    background-color: var(--kite-border);
+    color: var(--kite-accent);
 }
 
 .card {
-    border: none;
+    background-color: var(--kite-card-bg);
+    border: 1px solid var(--kite-border);
     border-radius: 10px;
-    box-shadow: 0 2px 8px rgba(0,0,0,.1);
+    box-shadow: 0 2px 8px rgba(0,0,0,.3);
     transition: transform 0.2s;
+    color: var(--kite-text-main);
 }
 
 .card:hover {
@@ -20,10 +66,71 @@ body {
 
 .table {
     margin-bottom: 0;
+    color: var(--kite-text-main);
+    background-color: var(--kite-card-bg);
 }
 
 .table thead {
-    background-color: #f8f9fa;
+    background-color: var(--kite-border);
+}
+
+.table thead th {
+    color: var(--kite-text-main);
+    border-color: var(--kite-border);
+}
+
+.table td, .table th {
+    border-color: var(--kite-border);
+}
+
+.table-dark {
+    --bs-table-bg: var(--kite-card-bg);
+    --bs-table-striped-bg: rgba(255, 255, 255, 0.05);
+    --bs-table-hover-bg: rgba(255, 255, 255, 0.075);
+}
+
+/* Button Styles */
+.btn-primary {
+    background-color: var(--kite-accent);
+    border-color: var(--kite-accent);
+    color: #FFFFFF;
+}
+
+.btn-primary:hover {
+    background-color: #8F0D52;
+    border-color: #8F0D52;
+}
+
+.btn-outline-primary {
+    color: var(--kite-accent);
+    border-color: var(--kite-accent);
+}
+
+.btn-outline-primary:hover {
+    background-color: var(--kite-accent);
+    border-color: var(--kite-accent);
+    color: #FFFFFF;
+}
+
+.btn-success {
+    background-color: var(--kite-success);
+    border-color: var(--kite-success);
+}
+
+.btn-danger {
+    background-color: var(--kite-danger);
+    border-color: var(--kite-danger);
+}
+
+.btn-info {
+    background-color: var(--kite-info);
+    border-color: var(--kite-info);
+}
+
+.btn-warning {
+    background-color: var(--kite-warning);
+    border-color: var(--kite-warning);
+    color: var(--kite-primary-bg);
 }
 
 .sticky-top {
@@ -41,11 +148,120 @@ body {
     font-size: 2.5rem;
     font-weight: bold;
     margin: 1rem 0;
+    color: var(--kite-text-main);
 }
 
 .spinner-border {
     width: 3rem;
     height: 3rem;
+}
+
+/* Badge and Alert Styles */
+.badge {
+    font-size: 0.9rem;
+    padding: 0.5rem 0.8rem;
+}
+
+.badge.bg-success {
+    background-color: var(--kite-success) !important;
+}
+
+.badge.bg-danger {
+    background-color: var(--kite-danger) !important;
+}
+
+.badge.bg-info {
+    background-color: var(--kite-info) !important;
+}
+
+.badge.bg-warning {
+    background-color: var(--kite-warning) !important;
+    color: var(--kite-primary-bg) !important;
+}
+
+.badge.bg-secondary {
+    background-color: var(--kite-secondary) !important;
+    color: var(--kite-primary-bg) !important;
+}
+
+/* Text Colors */
+.text-success {
+    color: var(--kite-success) !important;
+}
+
+.text-danger {
+    color: var(--kite-danger) !important;
+}
+
+.text-info {
+    color: var(--kite-info) !important;
+}
+
+.text-warning {
+    color: var(--kite-warning) !important;
+}
+
+.text-muted {
+    color: var(--kite-text-muted) !important;
+}
+
+/* Form Controls */
+.form-control {
+    background-color: var(--kite-card-bg);
+    border-color: var(--kite-border);
+    color: var(--kite-text-main);
+}
+
+.form-control:focus {
+    background-color: var(--kite-card-bg);
+    border-color: var(--kite-accent);
+    color: var(--kite-text-main);
+    box-shadow: 0 0 0 0.2rem rgba(175, 23, 99, 0.25);
+}
+
+.form-select {
+    background-color: var(--kite-card-bg);
+    border-color: var(--kite-border);
+    color: var(--kite-text-main);
+}
+
+/* Modal Styles */
+.modal-content {
+    background-color: var(--kite-card-bg);
+    border: 1px solid var(--kite-border);
+}
+
+.modal-header {
+    border-bottom-color: var(--kite-border);
+}
+
+.modal-footer {
+    border-top-color: var(--kite-border);
+}
+
+/* Additional Utility Classes */
+.bg-kite-primary {
+    background-color: var(--kite-primary-bg) !important;
+}
+
+.bg-kite-card {
+    background-color: var(--kite-card-bg) !important;
+}
+
+.border-kite {
+    border-color: var(--kite-border) !important;
+}
+
+.text-kite-main {
+    color: var(--kite-text-main) !important;
+}
+
+.text-kite-muted {
+    color: var(--kite-text-muted) !important;
+}
+
+.text-kite-accent {
+    color: var(--kite-accent) !important;
 }
 
 .text-success {

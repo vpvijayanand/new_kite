@@ -5,38 +5,39 @@
 {% block extra_css %}
 <style>
 .strategy-card {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border: none;
+    background: linear-gradient(135deg, var(--kite-accent) 0%, #8F0D52 100%);
+    border: 1px solid var(--kite-border);
     border-radius: 15px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
     transition: all 0.3s ease;
 }
 
 .strategy-card:hover {
     transform: translateY(-5px);
-    box-shadow: 0 15px 45px rgba(0,0,0,0.2);
+    box-shadow: 0 15px 45px rgba(175, 23, 99, 0.3);
 }
 
 .strategy-icon {
     font-size: 3rem;
     margin-bottom: 1rem;
-    color: #fff;
+    color: var(--kite-text-main);
 }
 
 .strategy-title {
     font-size: 1.5rem;
     font-weight: bold;
-    color: #fff;
+    color: var(--kite-text-main);
     margin-bottom: 0.5rem;
 }
 
 .strategy-description {
-    color: rgba(255,255,255,0.9);
+    color: var(--kite-text-muted);
     margin-bottom: 1.5rem;
 }
 
 .strategy-stats {
-    background: rgba(255,255,255,0.1);
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--kite-border);
     border-radius: 10px;
     padding: 1rem;
     margin-bottom: 1rem;
