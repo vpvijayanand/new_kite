@@ -12,7 +12,7 @@ class OICrossoverService:
     def __init__(self):
         self.ist_timezone = pytz.timezone('Asia/Kolkata')
         
-    def get_oi_crossover_summary(self, start_date=None, end_date=None, start_time=None, end_time=None):
+    def get_oi_crossover_summary(self, start_date=None, end_date=None, start_time=None, end_time=None, underlying='NIFTY'):
         """
         Get OI crossover summary with total PE change %, CE change % and difference %
         """
@@ -22,16 +22,19 @@ class OICrossoverService:
                 start_date, end_date, start_time, end_time
             )
             
-            print(f"DEBUG: Getting OI summary from {start_datetime} to {end_datetime}")
+            print(f"DEBUG: Getting OI summary for {underlying} from {start_datetime} to {end_datetime}")
             
-            # Get all OI data for the time range for both NIFTY and BANKNIFTY
+            # Get OI data for the selected underlying
+            primary_summary = self._calculate_oi_summary(underlying, start_datetime, end_datetime)
+            
+            # Also get data for both underlyings for reference
             nifty_summary = self._calculate_oi_summary('NIFTY', start_datetime, end_datetime)
             banknifty_summary = self._calculate_oi_summary('BANKNIFTY', start_datetime, end_datetime)
             
-            # Combine summaries
-            total_pe_change_percent = (nifty_summary['pe_change_percent'] + banknifty_summary['pe_change_percent']) / 2
-            total_ce_change_percent = (nifty_summary['ce_change_percent'] + banknifty_summary['ce_change_percent']) / 2
-            total_difference_percent = total_ce_change_percent - total_pe_change_percent
+            # Use the selected underlying's data as primary values
+            total_pe_change_percent = primary_summary['pe_change_percent']
+            total_ce_change_percent = primary_summary['ce_change_percent']
+            total_difference_percent = total_pe_change_percent - total_ce_change_percent
             
             return {
                 'total_pe_change_percent': round(total_pe_change_percent, 2),
@@ -57,44 +60,57 @@ class OICrossoverService:
     def _calculate_oi_summary(self, underlying, start_datetime, end_datetime):
         """Calculate OI change summary for a specific underlying"""
         try:
-            # Get OI data for the time range
-            oi_data = OptionChainData.query.filter(
+            from sqlalchemy import func
+            
+            # Get cumulative OI changes during the time period
+            oi_changes = db.session.query(
+                func.sum(OptionChainData.pe_oi_change).label('total_pe_change'),
+                func.sum(OptionChainData.ce_oi_change).label('total_ce_change'),
+                func.avg(OptionChainData.pe_oi).label('avg_pe_oi'),
+                func.avg(OptionChainData.ce_oi).label('avg_ce_oi'),
+                func.count(OptionChainData.id).label('record_count')
+            ).filter(
                 OptionChainData.underlying == underlying,
                 OptionChainData.timestamp >= start_datetime,
                 OptionChainData.timestamp <= end_datetime
-            ).order_by(OptionChainData.timestamp).all()
+            ).first()
             
-            if not oi_data:
+            if not oi_changes or oi_changes.record_count == 0:
                 return {
                     'pe_change_percent': 0,
                     'ce_change_percent': 0,
                     'total_pe_oi': 0,
                     'total_ce_oi': 0,
+                    'total_pe_change': 0,
+                    'total_ce_change': 0,
                     'records_count': 0
                 }
             
-            print(f"DEBUG: Found {len(oi_data)} {underlying} OI records")
+            print(f"DEBUG: {underlying} - Analyzing {oi_changes.record_count} records from {start_datetime} to {end_datetime}")
             
-            # Calculate total OI changes
-            total_pe_change = sum([record.pe_oi_change for record in oi_data if record.pe_oi_change])
-            total_ce_change = sum([record.ce_oi_change for record in oi_data if record.ce_oi_change])
+            # Get the cumulative changes and average OI values
+            total_pe_change = oi_changes.total_pe_change or 0
+            total_ce_change = oi_changes.total_ce_change or 0
+            avg_pe_oi = oi_changes.avg_pe_oi or 0
+            avg_ce_oi = oi_changes.avg_ce_oi or 0
             
-            # Calculate average total OI to compute percentage
-            total_pe_oi = sum([record.pe_oi for record in oi_data if record.pe_oi]) / len(oi_data) if oi_data else 0
-            total_ce_oi = sum([record.ce_oi for record in oi_data if record.ce_oi]) / len(oi_data) if oi_data else 0
+            # Calculate percentage changes based on average OI as baseline
+            pe_change_percent = (total_pe_change / avg_pe_oi * 100) if avg_pe_oi > 0 else 0
+            ce_change_percent = (total_ce_change / avg_ce_oi * 100) if avg_ce_oi > 0 else 0
             
-            # Calculate percentage changes
-            pe_change_percent = (total_pe_change / total_pe_oi * 100) if total_pe_oi > 0 else 0
-            ce_change_percent = (total_ce_change / total_ce_oi * 100) if total_ce_oi > 0 else 0
+            print(f"DEBUG: {underlying} - Total PE OI Change: {total_pe_change:,.0f}")
+            print(f"DEBUG: {underlying} - Total CE OI Change: {total_ce_change:,.0f}")
+            print(f"DEBUG: {underlying} - Avg PE OI: {avg_pe_oi:,.0f}, Avg CE OI: {avg_ce_oi:,.0f}")
+            print(f"DEBUG: {underlying} - PE Change %: {pe_change_percent:.2f}%, CE Change %: {ce_change_percent:.2f}%")
             
             return {
                 'pe_change_percent': round(pe_change_percent, 2),
                 'ce_change_percent': round(ce_change_percent, 2),
-                'total_pe_oi': total_pe_oi,
-                'total_ce_oi': total_ce_oi,
+                'total_pe_oi': avg_pe_oi,
+                'total_ce_oi': avg_ce_oi,
                 'total_pe_change': total_pe_change,
                 'total_ce_change': total_ce_change,
-                'records_count': len(oi_data)
+                'records_count': oi_changes.record_count
             }
             
         except Exception as e:

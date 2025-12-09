@@ -99,7 +99,7 @@ source venv/bin/activate
 # Upgrade pip and install wheel
 pip install --upgrade pip wheel setuptools
 
-# Install Python dependencies
+# Install Python dependencies from requirements.txt
 pip install -r requirements.txt
 
 # Install additional production dependencies
@@ -547,10 +547,16 @@ echo "0 2 * * * /usr/local/bin/backup_kite_db.sh" | sudo crontab -
 # Quick development setup
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# Install all Python dependencies from requirements.txt
 pip install -r requirements.txt
+
+# Initialize database
 flask db init
 flask db migrate -m "Initial migration"
 flask db upgrade
+
+# Run the application
 python run.py
 ```
 

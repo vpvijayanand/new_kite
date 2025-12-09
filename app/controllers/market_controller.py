@@ -34,6 +34,11 @@ def fetch_price_job():
                     market_service.fetch_and_save_option_chain("NIFTY")
                     market_service.fetch_and_save_option_chain("BANKNIFTY")
                 
+                # Fetch futures data (every 5 minutes to avoid rate limits)
+                if current_minute % 5 == 0:  # Every 5 minutes
+                    market_service.fetch_and_save_futures_data("NIFTY")
+                    market_service.fetch_and_save_futures_data("BANKNIFTY")
+                
                 print(f"Market data fetched at {datetime.now()}")
         else:
             with current_app.app_context():
@@ -46,6 +51,11 @@ def fetch_price_job():
                 if current_minute % 2 == 0:
                     market_service.fetch_and_save_option_chain("NIFTY")
                     market_service.fetch_and_save_option_chain("BANKNIFTY")
+                
+                # Fetch futures data every 5 minutes
+                if current_minute % 5 == 0:
+                    market_service.fetch_and_save_futures_data("NIFTY")
+                    market_service.fetch_and_save_futures_data("BANKNIFTY")
                 
                 print(f"Market data fetched at {datetime.now()}")
     except Exception as e:

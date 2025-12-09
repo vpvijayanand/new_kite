@@ -1,5 +1,6 @@
 from app.models.nifty_price import NiftyPrice
 from app.models.banknifty_price import BankNiftyPrice, OptionChainData, MarketTrend
+from app.models.futures_oi_data import FuturesOIData
 from app.services.kite_service import KiteService
 from app import db
 from datetime import datetime, timedelta
@@ -57,7 +58,34 @@ class MarketService:
             print(f"Error in fetch_and_save_option_chain for {underlying}: {str(e)}")
             return None
     
-
+    def fetch_and_save_futures_data(self, underlying="NIFTY"):
+        """Fetch and save futures OI data for given underlying"""
+        try:
+            futures_data = self.kite_service.get_futures_data(underlying)
+            
+            if futures_data:
+                # Create FuturesOIData instance and save
+                futures_record = FuturesOIData(
+                    underlying=underlying,
+                    expiry_date=futures_data.get('expiry_date'),
+                    futures_price=futures_data.get('futures_price', 0),
+                    open_interest=futures_data.get('open_interest', 0),
+                    volume=futures_data.get('volume', 0),
+                    timestamp=datetime.utcnow()
+                )
+                
+                db.session.add(futures_record)
+                db.session.commit()
+                
+                print(f"Saved futures data for {underlying}: Price={futures_data.get('futures_price')}, OI={futures_data.get('open_interest')}")
+                return futures_data
+            else:
+                print(f"No futures data available for {underlying}")
+                return None
+        except Exception as e:
+            print(f"Error in fetch_and_save_futures_data for {underlying}: {str(e)}")
+            db.session.rollback()
+            return None
     
     def get_latest_prices(self, limit=100):
         return NiftyPrice.get_latest_prices(limit)

@@ -1,5 +1,6 @@
 from app.models.futures_oi_data import FuturesOIData
 from app.services.datetime_filter_service import DateTimeFilterService
+from app.utils.datetime_utils import format_ist_time_only
 from app import db
 from sqlalchemy import func, and_, desc
 from datetime import datetime, timedelta
@@ -17,27 +18,68 @@ class FuturesOIService:
         """
         try:
             # Convert dates to datetime objects for filtering
-            start_datetime, end_datetime = self.datetime_filter._prepare_datetime_range(
-                start_date, end_date, start_time, end_time
-            )
+            from datetime import datetime
+            import pytz
             
-            print(f"DEBUG: Getting futures OI data for {underlying} from {start_datetime} to {end_datetime}")
+            # Parse date strings
+            if isinstance(start_date, str):
+                start_date_obj = datetime.strptime(start_date, '%Y-%m-%d').date()
+            else:
+                start_date_obj = start_date
+            
+            if isinstance(end_date, str):
+                end_date_obj = datetime.strptime(end_date, '%Y-%m-%d').date()
+            else:
+                end_date_obj = end_date
+                
+            # Parse time strings  
+            if start_time:
+                start_time_obj = datetime.strptime(start_time, '%H:%M').time()
+            else:
+                start_time_obj = datetime.strptime('09:15', '%H:%M').time()
+                
+            if end_time:
+                end_time_obj = datetime.strptime(end_time, '%H:%M').time()
+            else:
+                end_time_obj = datetime.strptime('15:30', '%H:%M').time()
+            
+            # For date filtering, use market hours to avoid previous day data
+            # If time range spans full day (00:00-23:59), use market hours instead
+            if (start_time_obj.hour == 0 and start_time_obj.minute == 0 and 
+                end_time_obj.hour == 23 and end_time_obj.minute == 59):
+                start_time_obj = datetime.strptime('09:15', '%H:%M').time()
+                end_time_obj = datetime.strptime('15:30', '%H:%M').time()
+            
+            # Combine date and time
+            start_datetime = datetime.combine(start_date_obj, start_time_obj)
+            end_datetime = datetime.combine(end_date_obj, end_time_obj)
+            
+            # Convert to UTC (assuming IST input)
+            ist_tz = pytz.timezone('Asia/Kolkata')
+            start_datetime_utc = ist_tz.localize(start_datetime).astimezone(pytz.UTC)
+            end_datetime_utc = ist_tz.localize(end_datetime).astimezone(pytz.UTC)
+            
+            # Convert to naive UTC for database comparison (database stores naive UTC timestamps)
+            start_datetime_naive = start_datetime_utc.replace(tzinfo=None)
+            end_datetime_naive = end_datetime_utc.replace(tzinfo=None)
+            
+            print(f"DEBUG: Getting futures OI data for {underlying} from {start_datetime_naive} to {end_datetime_naive} UTC")
             
             # Query futures OI data
             query = db.session.query(FuturesOIData).filter(
                 and_(
                     FuturesOIData.underlying == underlying,
-                    FuturesOIData.timestamp >= start_datetime,
-                    FuturesOIData.timestamp <= end_datetime
+                    FuturesOIData.timestamp >= start_datetime_naive,
+                    FuturesOIData.timestamp <= end_datetime_naive
                 )
-            ).order_by(FuturesOIData.timestamp.asc())
+            ).order_by(FuturesOIData.timestamp.desc())
             
             futures_data = query.all()
             
-            # If no data exists, try to fetch and store some sample data
+            # If no data exists, return empty list (live data only)
             if not futures_data:
-                print(f"DEBUG: No futures data found for {underlying}, creating sample data")
-                futures_data = self._create_sample_data(underlying, start_datetime, end_datetime)
+                print(f"DEBUG: No futures data found for {underlying}. Live data will be collected during market hours.")
+                return []
             
             # Calculate changes and trends
             analyzed_data = self._calculate_trends(futures_data)
@@ -76,7 +118,7 @@ class FuturesOIService:
             # Add to analyzed data
             analyzed_data.append({
                 'id': record.id,
-                'time': record.timestamp.strftime('%H:%M:%S'),
+                'time': format_ist_time_only(record.timestamp),
                 'futures_price': record.futures_price,
                 'open_interest': record.open_interest,
                 'volume': record.volume,
@@ -105,62 +147,7 @@ class FuturesOIService:
         else:
             return 'warning'  # Yellow
     
-    def _create_sample_data(self, underlying, start_datetime, end_datetime):
-        """Create sample futures data for demonstration"""
-        try:
-            # Base price for the underlying
-            base_price = 24500 if underlying == 'NIFTY' else 52000
-            base_oi = 5000000 if underlying == 'NIFTY' else 3000000
-            
-            # Get current expiry (next Friday)
-            current_date = start_datetime.date()
-            days_ahead = 4 - current_date.weekday()  # Friday is 4
-            if days_ahead <= 0:
-                days_ahead += 7
-            expiry_date = current_date + timedelta(days=days_ahead)
-            
-            sample_data = []
-            current_time = start_datetime
-            
-            # Generate data every 5 minutes
-            while current_time <= end_datetime:
-                # Simulate some price and OI movements
-                import random
-                price_change = random.uniform(-50, 50)
-                oi_change = random.randint(-100000, 100000)
-                
-                futures_price = base_price + price_change
-                open_interest = max(base_oi + oi_change, 1000000)  # Minimum OI
-                volume = random.randint(50000, 200000)
-                
-                # Create record
-                record = FuturesOIData(
-                    underlying=underlying,
-                    expiry_date=expiry_date,
-                    timestamp=current_time,
-                    futures_price=futures_price,
-                    open_interest=open_interest,
-                    volume=volume
-                )
-                
-                db.session.add(record)
-                sample_data.append(record)
-                
-                # Move to next 5-minute interval
-                current_time += timedelta(minutes=5)
-                base_price = futures_price  # Update base for next iteration
-                base_oi = open_interest
-            
-            # Commit sample data
-            db.session.commit()
-            print(f"DEBUG: Created {len(sample_data)} sample records for {underlying}")
-            
-            return sample_data
-            
-        except Exception as e:
-            print(f"Error creating sample data: {str(e)}")
-            db.session.rollback()
-            return []
+    # Sample data creation removed - using live data only
     
     def store_futures_data(self, underlying, expiry_date, futures_price, open_interest, volume=0, timestamp=None):
         """Store new futures data point"""

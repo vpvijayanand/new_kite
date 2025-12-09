@@ -468,3 +468,61 @@ class KiteService:
             'change': round(base_price * variation, 2),
             'change_percent': round(variation * 100, 2)
         }
+    
+    def get_futures_data(self, underlying="NIFTY"):
+        """
+        Fetch futures data for given underlying (NIFTY/BANKNIFTY)
+        Returns futures price and open interest data
+        """
+        try:
+            kite = self.get_kite_instance()
+            
+            # Get current month futures symbol
+            from datetime import datetime, timedelta
+            import calendar
+            
+            # Calculate current month expiry (last Thursday)
+            today = datetime.now()
+            year = today.year
+            month = today.month
+            
+            # Find last Thursday of current month
+            last_day = calendar.monthrange(year, month)[1]
+            last_date = datetime(year, month, last_day)
+            
+            # Find last Thursday
+            while last_date.weekday() != 3:  # Thursday is 3
+                last_date -= timedelta(days=1)
+            
+            # Format expiry date for symbol (YYMM format without day)
+            expiry_str = last_date.strftime("%y%b").upper()
+            
+            # Construct futures symbol
+            if underlying == "NIFTY":
+                symbol = f"NFO:NIFTY{expiry_str}FUT"
+            elif underlying == "BANKNIFTY":
+                symbol = f"NFO:BANKNIFTY{expiry_str}FUT"
+            else:
+                raise ValueError(f"Unsupported underlying: {underlying}")
+            
+            # Fetch futures quote
+            quote_data = kite.quote([symbol])
+            
+            if quote_data and symbol in quote_data:
+                data = quote_data[symbol]
+                
+                return {
+                    'underlying': underlying,
+                    'symbol': symbol,
+                    'expiry_date': last_date.date(),
+                    'futures_price': data.get('last_price', 0),
+                    'open_interest': data.get('oi', 0),
+                    'volume': data.get('volume', 0),
+                    'timestamp': datetime.now()
+                }
+            
+            return None
+            
+        except Exception as e:
+            print(f"Error fetching futures data for {underlying}: {str(e)}")
+            return None

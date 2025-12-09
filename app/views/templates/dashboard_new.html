@@ -1033,11 +1033,24 @@ function initCharts() {
 // Load OI data for charts (matching original OI analysis implementation)
 async function loadOIData(underlying) {
     try {
-        const response = await fetch(`/api/oi-changes-timeline?underlying=${underlying}`);
+        console.log(`Fetching OI data for ${underlying}...`);
+        const url = `/api/oi-changes-timeline?underlying=${underlying}`;
+        console.log(`API URL: ${url}`);
+        
+        const response = await fetch(url);
+        console.log(`Response status: ${response.status}`);
+        
         const data = await response.json();
+        console.log(`API response for ${underlying}:`, {
+            success: data.success,
+            data_keys: Object.keys(data.data || {}),
+            error: data.error
+        });
+        
         if (data.success) {
             return data.data;
         }
+        console.warn(`API returned error for ${underlying}:`, data.error);
         return { labels: [], ce_changes: [], pe_changes: [] };
     } catch (error) {
         console.error(`Error loading ${underlying} OI data:`, error);
@@ -1304,24 +1317,66 @@ async function updateMarketSignal() {
 
 // Update charts with data
 async function updateCharts() {
-    // Load NIFTY data (with index price)
-    const niftyData = await loadOIData('NIFTY');
-    if (niftyData.labels && niftyData.labels.length > 0) {
-        niftyChart.data.labels = niftyData.labels;
-        niftyChart.data.datasets[0].data = niftyData.ce_changes; // CE OI Change (Red)
-        niftyChart.data.datasets[1].data = niftyData.pe_changes; // PE OI Change (Green)
-        niftyChart.data.datasets[2].data = niftyData.index_prices; // NIFTY Index Price (Black)
-        niftyChart.update();
-    }
+    console.log('Starting updateCharts function...');
+    
+    try {
+        // Load NIFTY data (with index price)
+        console.log('Loading NIFTY data...');
+        const niftyData = await loadOIData('NIFTY');
+        console.log('NIFTY data loaded:', {
+            labels_count: niftyData.labels?.length || 0,
+            ce_changes_count: niftyData.ce_changes?.length || 0,
+            pe_changes_count: niftyData.pe_changes?.length || 0,
+            sample_data: {
+                first_label: niftyData.labels?.[0],
+                last_label: niftyData.labels?.[niftyData.labels.length - 1],
+                first_ce: niftyData.ce_changes?.[0],
+                first_pe: niftyData.pe_changes?.[0]
+            }
+        });
+        
+        if (niftyData.labels && niftyData.labels.length > 0) {
+            console.log('Updating NIFTY chart...');
+            niftyChart.data.labels = niftyData.labels;
+            niftyChart.data.datasets[0].data = niftyData.ce_changes; // CE OI Change (Red)
+            niftyChart.data.datasets[1].data = niftyData.pe_changes; // PE OI Change (Green)
+            niftyChart.data.datasets[2].data = niftyData.index_prices; // NIFTY Index Price (Black)
+            niftyChart.update();
+            console.log('NIFTY chart updated successfully');
+        } else {
+            console.log('No NIFTY data to display');
+        }
 
-    // Load BANKNIFTY data (with index price)
-    const bankniftyData = await loadOIData('BANKNIFTY');
-    if (bankniftyData.labels && bankniftyData.labels.length > 0) {
-        bankniftyChart.data.labels = bankniftyData.labels;
-        bankniftyChart.data.datasets[0].data = bankniftyData.ce_changes; // CE OI Change (Red)
-        bankniftyChart.data.datasets[1].data = bankniftyData.pe_changes; // PE OI Change (Green)
-        bankniftyChart.data.datasets[2].data = bankniftyData.index_prices; // BANKNIFTY Index Price (Black)
-        bankniftyChart.update();
+        // Load BANKNIFTY data (with index price)
+        console.log('Loading BANKNIFTY data...');
+        const bankniftyData = await loadOIData('BANKNIFTY');
+        console.log('BANKNIFTY data loaded:', {
+            labels_count: bankniftyData.labels?.length || 0,
+            ce_changes_count: bankniftyData.ce_changes?.length || 0,
+            pe_changes_count: bankniftyData.pe_changes?.length || 0,
+            sample_data: {
+                first_label: bankniftyData.labels?.[0],
+                last_label: bankniftyData.labels?.[bankniftyData.labels.length - 1],
+                first_ce: bankniftyData.ce_changes?.[0],
+                first_pe: bankniftyData.pe_changes?.[0]
+            }
+        });
+        
+        if (bankniftyData.labels && bankniftyData.labels.length > 0) {
+            console.log('Updating BANKNIFTY chart...');
+            bankniftyChart.data.labels = bankniftyData.labels;
+            bankniftyChart.data.datasets[0].data = bankniftyData.ce_changes; // CE OI Change (Red)
+            bankniftyChart.data.datasets[1].data = bankniftyData.pe_changes; // PE OI Change (Green)
+            bankniftyChart.data.datasets[2].data = bankniftyData.index_prices; // BANKNIFTY Index Price (Black)
+            bankniftyChart.update();
+            console.log('BANKNIFTY chart updated successfully');
+        } else {
+            console.log('No BANKNIFTY data to display');
+        }
+        
+        console.log('updateCharts function completed successfully');
+    } catch (error) {
+        console.error('Error in updateCharts:', error);
     }
 }
 

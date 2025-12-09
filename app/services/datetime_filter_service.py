@@ -166,3 +166,13 @@ class DateTimeFilterService:
     def get_today():
         """Get today's date"""
         return date.today()
+    
+    @staticmethod
+    def get_target_date(start_date, end_date):
+        """Get target date from start and end dates, preferring start_date"""
+        if start_date:
+            return start_date
+        elif end_date:
+            return end_date
+        else:
+            return date.today()
