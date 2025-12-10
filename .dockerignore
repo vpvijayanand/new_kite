@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Local development
+.env.local
+.env.development
+
+# Database
+*.db
+*.sqlite3
+
+# Node modules (if any)
+node_modules/
+
+# Storage
+storage/
+!storage/.gitkeep
+
+# SSL certificates
+docker/ssl/
+!docker/ssl/.gitkeep
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+README.md
+docs/

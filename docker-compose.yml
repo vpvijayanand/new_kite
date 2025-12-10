@@ -1,0 +1,95 @@
+version: '3.8'
+
+services:
+  # Flask Application
+  kite_app:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: kite_trading_app
+    restart: unless-stopped
+    volumes:
+      # Mount source code for development (can be removed in production)
+      - .:/app
+      # Mount storage for logs and data persistence
+      - ./storage:/app/storage
+      - ./logs:/app/logs
+    environment:
+      - FLASK_ENV=production
+      - FLASK_APP=run.py
+      - DATABASE_URL=sqlite:///storage/kite_app.db
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
+      - KITE_API_KEY=${KITE_API_KEY}
+      - KITE_API_SECRET=${KITE_API_SECRET}
+    networks:
+      - kite_network
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: kite_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # Mount nginx configuration
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/sites-available/:/etc/nginx/sites-available/:ro
+      - ./docker/nginx/sites-enabled/:/etc/nginx/sites-enabled/:ro
+      # SSL certificates (to be created)
+      - ./docker/ssl:/etc/nginx/ssl:ro
+      # Logs
+      - ./logs/nginx:/var/log/nginx
+      # Static files (if any)
+      - ./app/views/static:/var/www/static:ro
+    networks:
+      - kite_network
+    depends_on:
+      - kite_app
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis for session storage and caching
+  redis:
+    image: redis:7-alpine
+    container_name: kite_redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+      - ./logs/redis:/var/log/redis
+    networks:
+      - kite_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Certbot for SSL certificates
+  certbot:
+    image: certbot/certbot
+    container_name: kite_certbot
+    volumes:
+      - ./docker/ssl:/etc/letsencrypt
+      - ./docker/ssl/www:/var/www/certbot
+    command: certonly --webroot --webroot-path=/var/www/certbot --email your-email@domain.com --agree-tos --no-eff-email -d newai.vijayanandpremnath.cloud
+    depends_on:
+      - nginx
+
+volumes:
+  redis_data:
+
+networks:
+  kite_network:
+    driver: bridge

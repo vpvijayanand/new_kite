@@ -1,0 +1,96 @@
+# HTTP Server - Redirect to HTTPS
+server {
+    listen 80;
+    server_name newai.vijayanandpremnath.cloud www.newai.vijayanandpremnath.cloud;
+
+    # Let's Encrypt challenge
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    # Redirect all HTTP requests to HTTPS
+    location / {
+        return 301 https://$server_name$request_uri;
+    }
+}
+
+# HTTPS Server
+server {
+    listen 443 ssl http2;
+    server_name newai.vijayanandpremnath.cloud www.newai.vijayanandpremnath.cloud;
+
+    # Document root
+    root /var/www/new_aitrader;
+    index index.html index.htm;
+
+    # SSL Configuration
+    ssl_certificate /etc/nginx/ssl/live/newai.vijayanandpremnath.cloud/fullchain.pem;
+    ssl_certificate_key /etc/nginx/ssl/live/newai.vijayanandpremnath.cloud/privkey.pem;
+    
+    # Modern SSL configuration
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-SHA384;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+    
+    # HSTS
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # Rate limiting for login endpoints
+    location /auth/login {
+        limit_req zone=login burst=5 nodelay;
+        proxy_pass http://kite_app:8000;
+        include /etc/nginx/proxy_params;
+    }
+
+    # Rate limiting for API endpoints
+    location /api/ {
+        limit_req zone=api burst=20 nodelay;
+        proxy_pass http://kite_app:8000;
+        include /etc/nginx/proxy_params;
+    }
+
+    # Static files
+    location /static/ {
+        alias /var/www/static/;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        access_log off;
+    }
+
+    # Health check endpoint
+    location /health {
+        proxy_pass http://kite_app:8000;
+        access_log off;
+    }
+
+    # Main application
+    location / {
+        proxy_pass http://kite_app:8000;
+        include /etc/nginx/proxy_params;
+        
+        # WebSocket support
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+
+    # Error pages
+    error_page 404 /404.html;
+    error_page 500 502 503 504 /50x.html;
+    
+    location = /50x.html {
+        root /var/www/html;
+    }
+
+    # Logging
+    access_log /var/log/nginx/newai.vijayanandpremnath.cloud.access.log;
+    error_log /var/log/nginx/newai.vijayanandpremnath.cloud.error.log;
+}
