@@ -42,10 +42,12 @@ RUN chown -R flaskapp:flaskapp /app
 # Switch to non-root user
 USER flaskapp
 
-# Create startup script
-COPY docker/entrypoint.sh /entrypoint.sh
+# Copy and setup entrypoint script
 USER root
-RUN chmod +x /entrypoint.sh
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh && \
+    apt-get update && apt-get install -y netcat-openbsd && \
+    rm -rf /var/lib/apt/lists/*
 USER flaskapp
 
 # Expose port

@@ -71,10 +71,14 @@ if [ ! -f .env ]; then
     print_warning "Current .env file has placeholder values"
 fi
 
-# Step 7: Enable nginx site
+# Step 7: Enable nginx site  
 print_status "Setting up Nginx configuration..."
+# Create symlinks for sites
 sudo ln -sf $APP_DIR/docker/nginx/sites-available/newai.vijayanandpremnath.cloud /etc/nginx/sites-available/
-sudo ln -sf $APP_DIR/docker/nginx/sites-available/newai.vijayanandpremnath.cloud /etc/nginx/sites-enabled/
+sudo ln -sf /etc/nginx/sites-available/newai.vijayanandpremnath.cloud /etc/nginx/sites-enabled/
+
+# Also create symlink in our docker structure for consistency
+ln -sf ../sites-available/newai.vijayanandpremnath.cloud docker/nginx/sites-enabled/newai.vijayanandpremnath.cloud
 
 # Step 8: Create nginx proxy_params
 sudo cp docker/nginx/proxy_params /etc/nginx/

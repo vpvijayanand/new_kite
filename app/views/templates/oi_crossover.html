@@ -35,6 +35,31 @@ select:focus {
         margin-bottom: 1rem;
     }
 }
+
+/* Blinking animation for arrows */
+@keyframes blink {
+    0% { opacity: 1; }
+    50% { opacity: 0.3; }
+    100% { opacity: 1; }
+}
+
+.blink {
+    animation: blink 1s infinite;
+}
+
+/* Arrow color styling - All arrows bright white */
+.arrow-up,
+.arrow-down,
+#peArrow,
+#ceArrow,
+#differenceArrow {
+    color: #ffffff !important; /* Bright white for all arrows */
+}
+
+/* Ensure arrows are visible on all backgrounds */
+.card .fas {
+    color: #ffffff !important;
+}
 </style>
 {% endblock %}
 
@@ -99,7 +124,7 @@ select:focus {
             <!-- Summary Cards -->
             <div class="row mb-4">
                 <div class="col-md-4">
-                    <div class="card bg-info text-white">
+                    <div class="card text-white" id="peCard">
                         <div class="card-body">
                             <div class="d-flex justify-content-between">
                                 <div>
@@ -109,14 +134,14 @@ select:focus {
                                     </h3>
                                 </div>
                                 <div class="align-self-center">
-                                    <i class="fas fa-arrow-down fa-2x"></i>
+                                    <i class="fas fa-arrow-up fa-2x" id="peArrow" style="color: #ffffff !important;"></i>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-4">
-                    <div class="card bg-success text-white">
+                    <div class="card text-white" id="ceCard">
                         <div class="card-body">
                             <div class="d-flex justify-content-between">
                                 <div>
@@ -126,14 +151,14 @@ select:focus {
                                     </h3>
                                 </div>
                                 <div class="align-self-center">
-                                    <i class="fas fa-arrow-up fa-2x"></i>
+                                    <i class="fas fa-arrow-down fa-2x" id="ceArrow" style="color: #ffffff !important;"></i>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-4">
-                    <div class="card" id="differenceCard">
+                    <div class="card text-white" id="differenceCard">
                         <div class="card-body">
                             <div class="d-flex justify-content-between">
                                 <div>
@@ -143,7 +168,7 @@ select:focus {
                                     </h3>
                                 </div>
                                 <div class="align-self-center">
-                                    <i class="fas fa-exchange-alt fa-2x"></i>
+                                    <i class="fas fa-arrow-up fa-2x" id="differenceArrow" style="color: #ffffff !important;"></i>
                                 </div>
                             </div>
                         </div>
@@ -336,66 +361,69 @@ function updateSummaryCards(data) {
     const ceElement = document.getElementById('totalCeChange');
     const diffElement = document.getElementById('totalDifference');
     
+    // Get card containers for styling
+    const peCard = document.getElementById('peCard');
+    const ceCard = document.getElementById('ceCard');
+    const diffCard = document.getElementById('differenceCard');
+    
     console.log('Elements found:', !!peElement, !!ceElement, !!diffElement);
     
-    // Complete reset - remove all content and attributes
+    // Update the display elements
     if (peElement) {
-        peElement.innerHTML = '';
-        peElement.textContent = '';
-        peElement.removeAttribute('data-value');
+        peElement.textContent = peText;
     }
     if (ceElement) {
-        ceElement.innerHTML = '';
-        ceElement.textContent = '';
-        ceElement.removeAttribute('data-value');
+        ceElement.textContent = ceText;
     }
     if (diffElement) {
-        diffElement.innerHTML = '';
-        diffElement.textContent = '';
-        diffElement.removeAttribute('data-value');
+        diffElement.textContent = diffText;
     }
     
-    // Force a visual refresh by changing style temporarily
-    peElement.style.opacity = '0.3';
-    ceElement.style.opacity = '0.3';
-    diffElement.style.opacity = '0.3';
-    peElement.style.backgroundColor = '#ffff00';
-    ceElement.style.backgroundColor = '#ffff00';
-    diffElement.style.backgroundColor = '#ffff00';
-    
-    setTimeout(() => {
-        // Update the display elements
-        peElement.textContent = peText;
-        ceElement.textContent = ceText;
-        diffElement.textContent = diffText;
-        
-        // Reset visual styling
-        peElement.style.opacity = '1';
-        ceElement.style.opacity = '1';
-        diffElement.style.opacity = '1';
-        peElement.style.backgroundColor = '';
-        ceElement.style.backgroundColor = '';
-        diffElement.style.backgroundColor = '';
-    }, 100);
-    
-    updateDifferenceCardColor();
+    // Apply color coding to cards
+    updateCardColors(peCard, ceCard, diffCard, diffValue);
 }
 
-// Update difference card color based on value
-function updateDifferenceCardColor() {
-    const differenceText = document.getElementById('totalDifference').textContent;
-    const differenceValue = parseFloat(differenceText.replace('%', ''));
-    const card = document.getElementById('differenceCard');
+// Update card colors and arrows based on requirements
+function updateCardColors(peCard, ceCard, diffCard, diffValue) {
+    // Remove existing color classes from all cards
+    const colorClasses = ['bg-success', 'bg-danger', 'bg-warning', 'bg-info', 'bg-primary', 'bg-secondary'];
     
-    // Remove existing color classes
-    card.classList.remove('bg-success', 'bg-danger', 'bg-warning', 'text-white');
+    [peCard, ceCard, diffCard].forEach(card => {
+        if (card) {
+            colorClasses.forEach(cls => card.classList.remove(cls));
+        }
+    });
     
-    if (differenceValue > 5) {
-        card.classList.add('bg-success', 'text-white');
-    } else if (differenceValue < -5) {
-        card.classList.add('bg-danger', 'text-white');
-    } else {
-        card.classList.add('bg-warning', 'text-white');
+    // Get arrow elements
+    const peArrow = document.getElementById('peArrow');
+    const ceArrow = document.getElementById('ceArrow');
+    const differenceArrow = document.getElementById('differenceArrow');
+    
+    // PE Change % - Always GREEN background, UP arrow (already set in HTML)
+    if (peCard) {
+        peCard.classList.add('bg-success');
+    }
+    
+    // CE Change % - Always RED background, DOWN arrow (already set in HTML)
+    if (ceCard) {
+        ceCard.classList.add('bg-danger');
+    }
+    
+    // Difference % - GREEN if positive, RED if negative with dynamic arrows
+    if (diffCard && differenceArrow) {
+        // Remove existing arrow classes
+        differenceArrow.classList.remove('fa-arrow-up', 'fa-arrow-down', 'arrow-up', 'arrow-down', 'blink', 'fa-arrow-right', 'text-muted');
+        
+        if (diffValue > 0) {
+            diffCard.classList.add('bg-success');  // Green for positive
+            differenceArrow.classList.add('fa-arrow-up', 'blink');  // UP arrow, blinking, white color
+        } else if (diffValue < 0) {
+            diffCard.classList.add('bg-danger');   // Red for negative
+            differenceArrow.classList.add('fa-arrow-down', 'blink');  // DOWN arrow, blinking, white color
+        } else {
+            diffCard.classList.add('bg-secondary'); // Gray for zero
+            differenceArrow.classList.add('fa-arrow-right');  // Right arrow for zero, white color
+        }
     }
 }
 

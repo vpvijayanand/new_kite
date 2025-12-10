@@ -9,11 +9,11 @@ services:
     container_name: kite_trading_app
     restart: unless-stopped
     volumes:
-      # Mount source code for development (can be removed in production)
-      - .:/app
       # Mount storage for logs and data persistence
       - ./storage:/app/storage
       - ./logs:/app/logs
+      # Mount source code (for live updates without rebuild)
+      - .:/app:ro
     environment:
       - FLASK_ENV=production
       - FLASK_APP=run.py
