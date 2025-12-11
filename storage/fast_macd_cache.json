@@ -1,0 +1,92 @@
+{
+  "NIFTY_30min": {
+    "signal": "BULLISH",
+    "macd_line": 43.29291833379466,
+    "signal_line": 35.49996558314045,
+    "histogram": 7.792952750654209,
+    "timestamp": "2025-12-11T15:03:00+05:30",
+    "formatted_time": "11-12 :  3:03 PM",
+    "last_updated": "2025-12-11T22:48:08.895039"
+  },
+  "NIFTY_15min": {
+    "signal": "BEARISH",
+    "macd_line": 31.008124330724968,
+    "signal_line": 32.35154679301442,
+    "histogram": -1.3434224622894533,
+    "timestamp": "2025-12-11T15:18:00+05:30",
+    "formatted_time": "11-12 :  3:18 PM",
+    "last_updated": "2025-12-11T22:48:08.719858"
+  },
+  "NIFTY_12min": {
+    "signal": "BEARISH",
+    "macd_line": 23.400462179808528,
+    "signal_line": 25.418256276729203,
+    "histogram": -2.0177940969206745,
+    "timestamp": "2025-12-11T15:25:00+05:30",
+    "formatted_time": "11-12 :  3:25 PM",
+    "last_updated": "2025-12-11T22:48:08.439696"
+  },
+  "NIFTY_6min": {
+    "signal": "BEARISH",
+    "macd_line": 9.46427885886078,
+    "signal_line": 10.488718824230308,
+    "histogram": -1.0244399653695275,
+    "timestamp": "2025-12-11T15:37:00+05:30",
+    "formatted_time": "11-12 :  3:37 PM",
+    "last_updated": "2025-12-11T22:48:08.287436"
+  },
+  "NIFTY_3min": {
+    "signal": "SELL",
+    "macd_line": 3.952916621852637,
+    "signal_line": 4.0258994868867175,
+    "histogram": -0.07298286503408047,
+    "timestamp": "2025-12-11T15:40:00+05:30",
+    "formatted_time": "11-12 :  3:40 PM",
+    "last_updated": "2025-12-11T22:48:08.126575"
+  },
+  "BANKNIFTY_3min": {
+    "signal": "BULLISH",
+    "macd_line": -8.002121227887983,
+    "signal_line": -10.333267749775498,
+    "histogram": 2.331146521887515,
+    "timestamp": "2025-12-11T15:42:00+05:30",
+    "formatted_time": "11-12 :  3:42 PM",
+    "last_updated": "2025-12-11T22:48:09.039992"
+  },
+  "BANKNIFTY_6min": {
+    "signal": "BEARISH",
+    "macd_line": -9.172064528211195,
+    "signal_line": -5.828074802251729,
+    "histogram": -3.3439897259594655,
+    "timestamp": "2025-12-11T15:40:00+05:30",
+    "formatted_time": "11-12 :  3:40 PM",
+    "last_updated": "2025-12-11T22:48:09.297468"
+  },
+  "BANKNIFTY_12min": {
+    "signal": "BEARISH",
+    "macd_line": 23.05733704661543,
+    "signal_line": 41.16033583535583,
+    "histogram": -18.1029987887404,
+    "timestamp": "2025-12-11T15:31:00+05:30",
+    "formatted_time": "11-12 :  3:31 PM",
+    "last_updated": "2025-12-11T22:48:09.409233"
+  },
+  "BANKNIFTY_15min": {
+    "signal": "BEARISH",
+    "macd_line": 47.6713031906329,
+    "signal_line": 67.23075429568917,
+    "histogram": -19.55945110505627,
+    "timestamp": "2025-12-11T15:25:00+05:30",
+    "formatted_time": "11-12 :  3:25 PM",
+    "last_updated": "2025-12-11T22:48:09.537124"
+  },
+  "BANKNIFTY_30min": {
+    "signal": "BULLISH",
+    "macd_line": 93.64969679401838,
+    "signal_line": 92.45741072924484,
+    "histogram": 1.1922860647735405,
+    "timestamp": "2025-12-11T15:21:00+05:30",
+    "formatted_time": "11-12 :  3:21 PM",
+    "last_updated": "2025-12-11T22:48:09.806653"
+  }
+}

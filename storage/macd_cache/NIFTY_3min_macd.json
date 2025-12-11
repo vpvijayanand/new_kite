@@ -1,0 +1,13 @@
+{
+  "success": true,
+  "signal": "SELL",
+  "macd_line": 0.6303763677024108,
+  "signal_line": 0.7715884792482304,
+  "histogram": -0.14121211154581959,
+  "symbol": "NIFTY",
+  "timeframe": 3,
+  "timestamp": "2025-12-11T14:06:00+05:30",
+  "formatted_time": "11-12 :  2:06 PM",
+  "timezone": "IST",
+  "last_updated": "2025-12-11T08:38:52.245882"
+}

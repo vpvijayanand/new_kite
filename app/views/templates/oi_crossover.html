@@ -48,6 +48,88 @@ select:focus {
 }
 
 /* Arrow color styling - All arrows bright white */
+
+/* MACD Signals Inline Styling */
+.signal-badge-inline {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    font-weight: bold;
+    border: 1px solid transparent;
+    transition: all 0.3s ease;
+    background: rgba(108, 117, 125, 0.2);
+    color: #6c757d;
+    min-height: 38px; /* Match button height */
+    min-width: 60px;
+    text-align: center;
+}
+
+.signal-badge-inline.buy {
+    background: #28a745;
+    color: white;
+    border-color: #28a745;
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.25);
+}
+
+.signal-badge-inline.sell {
+    background: #dc3545;
+    color: white;
+    border-color: #dc3545;
+    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.25);
+}
+
+.signal-badge-inline.bullish {
+    background: #28a745;
+    color: white;
+    border-color: #28a745;
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.25);
+}
+
+.signal-badge-inline.bearish {
+    background: #dc3545;
+    color: white;
+    border-color: #dc3545;
+    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.25);
+}
+
+.signal-badge-inline.neutral {
+    background: rgba(108, 117, 125, 0.3);
+    color: #adb5bd;
+    border-color: #6c757d;
+}
+
+.timeframe-label {
+    font-size: 0.7rem;
+    opacity: 0.8;
+    font-weight: normal;
+}
+
+.signal-text {
+    font-size: 0.75rem;
+    font-weight: bold;
+    line-height: 1;
+}
+
+.signal-time {
+    font-size: 0.6rem;
+    font-weight: normal;
+    opacity: 0.9;
+    line-height: 1;
+    margin-top: 1px;
+}
+
+/* Pulse animation for fresh signals */
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.5); }
+    70% { box-shadow: 0 0 0 6px rgba(255, 255, 255, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+}
+
+.signal-badge-inline.fresh {
+    animation: pulse 2s infinite;
+}
 .arrow-up,
 .arrow-down,
 #peArrow,
@@ -106,14 +188,55 @@ select:focus {
                                 <option value="BANKNIFTY" {{ 'selected' if underlying == 'BANKNIFTY' else '' }}>BANKNIFTY</option>
                             </select>
                         </div>
-                        <div class="col-12">
+                        <div class="col-md-6">
                             <button type="submit" class="btn btn-primary">
                                 <i class="fas fa-filter me-1"></i>Apply Filter
                             </button>
                             <button type="button" class="btn btn-secondary ms-2" onclick="resetFilters()">
                                 <i class="fas fa-refresh me-1"></i>Reset
                             </button>
-
+                        </div>
+                        <div class="col-md-6">
+                            <!-- MACD Signals Panel - Single Line -->
+                            <div class="d-flex align-items-center justify-content-center h-100">
+                                <div class="d-flex gap-2">
+                                    <div class="signal-badge-inline" id="macd-30min" data-timeframe="30">
+                                        <div class="d-flex flex-column align-items-center">
+                                            <small class="timeframe-label">30m</small>
+                                            <span class="signal-text">--</span>
+                                            <small class="signal-time">--</small>
+                                        </div>
+                                    </div>
+                                    <div class="signal-badge-inline" id="macd-15min" data-timeframe="15">
+                                        <div class="d-flex flex-column align-items-center">
+                                            <small class="timeframe-label">15m</small>
+                                            <span class="signal-text">--</span>
+                                            <small class="signal-time">--</small>
+                                        </div>
+                                    </div>
+                                    <div class="signal-badge-inline" id="macd-12min" data-timeframe="12">
+                                        <div class="d-flex flex-column align-items-center">
+                                            <small class="timeframe-label">12m</small>
+                                            <span class="signal-text">--</span>
+                                            <small class="signal-time">--</small>
+                                        </div>
+                                    </div>
+                                    <div class="signal-badge-inline" id="macd-6min" data-timeframe="6">
+                                        <div class="d-flex flex-column align-items-center">
+                                            <small class="timeframe-label">6m</small>
+                                            <span class="signal-text">--</span>
+                                            <small class="signal-time">--</small>
+                                        </div>
+                                    </div>
+                                    <div class="signal-badge-inline" id="macd-3min" data-timeframe="3">
+                                        <div class="d-flex flex-column align-items-center">
+                                            <small class="timeframe-label">3m</small>
+                                            <span class="signal-text">--</span>
+                                            <small class="signal-time">--</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </form>
                 </div>
@@ -204,6 +327,35 @@ select:focus {
             <div id="errorMessage" class="alert alert-danger" style="display: none;">
                 <i class="fas fa-exclamation-triangle me-2"></i>
                 <span id="errorText">An error occurred while loading data.</span>
+            </div>
+
+            <!-- MACD Signals History Table -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">📊 Last 6 MACD Signals by Timeframe</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-striped">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th>Timeframe</th>
+                                            <th>Current Signal</th>
+                                            <th>Signal Time</th>
+                                            <th>MACD Line</th>
+                                            <th>Signal Line</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="macdHistoryTable">
+                                        <tr><td colspan="5" class="text-center">Loading MACD data...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -668,6 +820,315 @@ function initializeDateTimePickers() {
     if (!document.getElementById('target_date').value) {
         document.getElementById('target_date').value = testDate;
     }
+    
+    // Initialize MACD signals
+    initializeMacdSignals();
 }
+
+// MACD Signals Functions
+function initializeMacdSignals() {
+    // Load initial MACD signals
+    loadMacdSignals();
+    
+    // Update when underlying changes
+    document.getElementById('underlying').addEventListener('change', function() {
+        updateMacdSymbolIndicator();
+        loadMacdSignals();
+    });
+    
+    // Set up auto-refresh every 30 seconds
+    setInterval(loadMacdSignals, 30000);
+    
+    // Initialize symbol indicator
+    updateMacdSymbolIndicator();
+}
+
+function updateMacdSymbolIndicator() {
+    // No longer needed since we removed the symbol indicator
+}
+
+async function loadMacdSignals() {
+    const underlying = document.getElementById('underlying').value;
+    const timeframes = [30, 15, 12, 6, 3];  // Updated order: 30min, 15min, 12min, 6min, 3min
+    
+    console.log('Loading MACD signals for:', underlying);
+    
+    try {
+        // Fetch MACD signals for all timeframes
+        const promises = timeframes.map(tf => fetchMacdSignal(underlying, tf));
+        const results = await Promise.all(promises);
+        
+        console.log('MACD results received:', results);
+        
+        // Update UI with results
+        results.forEach((result, index) => {
+            const timeframe = timeframes[index];
+            console.log(`Updating UI for ${timeframe}min:`, result);
+            updateMacdSignalUI(timeframe, result);
+        });
+        
+    } catch (error) {
+        console.error('Error loading MACD signals:', error);
+        // Show error state
+        timeframes.forEach(tf => {
+            updateMacdSignalUI(tf, { signal: 'ERROR', error: true });
+        });
+    }
+}
+
+async function fetchMacdSignal(symbol, timeframe) {
+    try {
+        const url = `/api/macd-signal?symbol=${symbol}&timeframe=${timeframe}`;
+        console.log(`Fetching MACD for ${timeframe}min:`, url);
+        
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Cache-Control': 'no-cache'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log(`MACD data for ${timeframe}min:`, data);
+        
+        return {
+            signal: data.signal || 'NEUTRAL',
+            timestamp: data.timestamp,
+            timeframe: timeframe,
+            macd_line: data.macd_line,
+            signal_line: data.signal_line,
+            error: false
+        };
+        
+    } catch (error) {
+        console.error(`Error fetching MACD for ${symbol} ${timeframe}min:`, error);
+        return {
+            signal: 'ERROR',
+            timeframe: timeframe,
+            error: true
+        };
+    }
+}
+
+function updateMacdSignalUI(timeframe, data) {
+    const elementId = `macd-${timeframe}min`;
+    const element = document.getElementById(elementId);
+    
+    if (!element) return;
+    
+    const signalText = element.querySelector('.signal-text');
+    const signalTime = element.querySelector('.signal-time');
+    
+    // Clear existing classes
+    element.classList.remove('buy', 'sell', 'bullish', 'bearish', 'neutral', 'fresh');
+    
+    if (data.error) {
+        signalText.textContent = 'ERR';
+        if (signalTime) signalTime.textContent = '--';
+        element.classList.add('neutral');
+        return;
+    }
+    
+    // Update signal text - show actual signal values or error states
+    if (data.signal) {
+        switch (data.signal.toUpperCase()) {
+            case 'BUY':
+                signalText.textContent = 'BUY';
+                element.classList.add('buy');
+                break;
+            case 'SELL':
+                signalText.textContent = 'SELL';
+                element.classList.add('sell');
+                break;
+            case 'BULLISH':
+                signalText.textContent = 'BUY';  // Show as BUY with green color
+                element.classList.add('bullish');
+                break;
+            case 'BEARISH':
+                signalText.textContent = 'SELL';  // Show as SELL with red color
+                element.classList.add('bearish');
+                break;
+            default:
+                signalText.textContent = '--';
+                element.classList.add('neutral');
+        }
+    } else {
+        signalText.textContent = '--';
+        element.classList.add('neutral');
+    }
+    
+    // Update time using formatted_time from API (IST with AM/PM)
+    if (signalTime) {
+        if (data.formatted_time) {
+            signalTime.textContent = data.formatted_time;
+            
+            // Add fresh class if signal is recent (check if today's date)
+            try {
+                const today = new Date();
+                const todayStr = `${today.getDate().toString().padStart(2, '0')}-${(today.getMonth() + 1).toString().padStart(2, '0')}`;
+                if (data.formatted_time.includes(todayStr)) {
+                    element.classList.add('fresh');
+                }
+            } catch (e) {
+                // Ignore error
+            }
+        } else {
+            signalTime.textContent = '--';
+        }
+    }
+    
+    // Add tooltip with detailed info
+    const tooltipText = data.error ? 'Error loading signal' : 
+        `Signal: ${data.signal}\nTimeframe: ${timeframe}min\nMACD: ${data.macd_line ? data.macd_line.toFixed(2) : 'N/A'}\nSignal Line: ${data.signal_line ? data.signal_line.toFixed(2) : 'N/A'}`;
+    element.title = tooltipText;
+}
+
+// Load MACD history data
+async function loadMacdHistory() {
+    const underlying = document.getElementById('underlying').value;
+    const timeframes = [30, 15, 12, 6, 3];  // Timeframes to load
+    
+    try {
+        // Clear existing table rows
+        const tableBody = document.getElementById('macdHistoryTable');
+        tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Loading MACD data...</td></tr>';
+        
+        // Fetch MACD signals for the last 6 occurrences for each timeframe
+        const promises = timeframes.map(tf => fetchMacdHistoryForTimeframe(underlying, tf));
+        const results = await Promise.all(promises);
+        
+        // Flatten results and filter out empty responses
+        const macdHistory = results.flat().filter(item => item);
+        
+        // Update table with MACD history
+        updateMacdHistoryTable(macdHistory);
+        
+    } catch (error) {
+        console.error('Error loading MACD history:', error);
+        showError('Failed to load MACD history');
+    }
+}
+
+async function fetchMacdHistoryForTimeframe(symbol, timeframe) {
+    try {
+        const url = `/api/macd-history?symbol=${symbol}&timeframe=${timeframe}&limit=6`;
+        console.log(`Fetching MACD history for ${timeframe}min:`, url);
+        
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Cache-Control': 'no-cache'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log(`MACD history data for ${timeframe}min:`, data);
+        
+        return data.history.map(item => ({
+            timeframe: timeframe,
+            signal: item.signal,
+            formatted_time: item.formatted_time,
+            macd_line: item.macd_line,
+            signal_line: item.signal_line
+        }));
+        
+    } catch (error) {
+        console.error(`Error fetching MACD history for ${symbol} ${timeframe}min:`, error);
+        return [];
+    }
+}
+
+function updateMacdHistoryTable(history) {
+    const tableBody = document.getElementById('macdHistoryTable');
+    tableBody.innerHTML = '';  // Clear existing rows
+    
+    history.forEach(item => {
+        const row = document.createElement('tr');
+        
+        row.innerHTML = `
+            <td>${item.timeframe}m</td>
+            <td class="${item.signal.toLowerCase()}">${item.signal}</td>
+            <td>${item.formatted_time}</td>
+            <td>${item.macd_line.toFixed(2)}</td>
+            <td>${item.signal_line.toFixed(2)}</td>
+        `;
+        
+        tableBody.appendChild(row);
+    });
+}
+
+// Load MACD history table
+async function loadMacdHistoryTable() {
+    try {
+        const timeframes = [30, 15, 12, 6, 3];
+        const tableBody = document.getElementById('macdHistoryTable');
+        
+        let tableHtml = '';
+        
+        for (const tf of timeframes) {
+            try {
+                const response = await fetch(`/api/macd-signal?symbol=NIFTY&timeframe=${tf}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const signal = data.signal || 'NEUTRAL';
+                    const signalClass = signal === 'BUY' || signal === 'BULLISH' ? 'text-success' : 
+                                       signal === 'SELL' || signal === 'BEARISH' ? 'text-danger' : 'text-muted';
+                    
+                    tableHtml += `
+                        <tr>
+                            <td><strong>${tf}min</strong></td>
+                            <td><span class="${signalClass} fw-bold">${signal}</span></td>
+                            <td>${data.formatted_time || '--'}</td>
+                            <td>${data.macd_line ? data.macd_line.toFixed(2) : '--'}</td>
+                            <td>${data.signal_line ? data.signal_line.toFixed(2) : '--'}</td>
+                        </tr>
+                    `;
+                } else {
+                    tableHtml += `
+                        <tr>
+                            <td><strong>${tf}min</strong></td>
+                            <td colspan="4" class="text-danger">Error loading data</td>
+                        </tr>
+                    `;
+                }
+            } catch (error) {
+                console.error(`Error loading ${tf}min MACD:`, error);
+                tableHtml += `
+                    <tr>
+                        <td><strong>${tf}min</strong></td>
+                        <td colspan="4" class="text-warning">Connection error</td>
+                    </tr>
+                `;
+            }
+        }
+        
+        tableBody.innerHTML = tableHtml;
+        
+    } catch (error) {
+        console.error('Error loading MACD history table:', error);
+        document.getElementById('macdHistoryTable').innerHTML = 
+            '<tr><td colspan="5" class="text-center text-danger">Failed to load MACD data</td></tr>';
+    }
+}
+
+// Load MACD table when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    // ...existing code...
+    
+    // Load MACD history table
+    setTimeout(loadMacdHistoryTable, 1000);
+    
+    // Refresh MACD table every 30 seconds
+    setInterval(loadMacdHistoryTable, 30000);
+});
 </script>
 {% endblock %}
