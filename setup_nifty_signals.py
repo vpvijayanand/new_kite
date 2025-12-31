@@ -34,18 +34,24 @@ def check_nifty_price_data():
     try:
         from app.models.nifty_price import NiftyPrice
         
-        # Get total count
-        total_records = NiftyPrice.query.count()
-        print(f"📈 Found {total_records} NIFTY price records")
+        # Get total count (try both NIFTY and NIFTY 50)
+        nifty_records = NiftyPrice.query.filter(
+            (NiftyPrice.symbol == 'NIFTY') | (NiftyPrice.symbol == 'NIFTY 50')
+        ).count()
+        print(f"📈 Found {nifty_records} NIFTY price records")
         
-        if total_records == 0:
+        if nifty_records == 0:
             print("⚠️ No NIFTY price data found. Please run market data collection first.")
             return False
         
         # Get latest record
-        latest_record = NiftyPrice.query.order_by(NiftyPrice.timestamp.desc()).first()
+        latest_record = NiftyPrice.query.filter(
+            (NiftyPrice.symbol == 'NIFTY') | (NiftyPrice.symbol == 'NIFTY 50')
+        ).order_by(NiftyPrice.timestamp.desc()).first()
+        
         if latest_record:
             print(f"🕐 Latest record: {latest_record.timestamp} - Price: ₹{latest_record.price}")
+            print(f"📊 Symbol: {latest_record.symbol}")
         
         return True
     except Exception as e:
@@ -58,23 +64,23 @@ def generate_initial_signals():
     try:
         signal_generator = NiftySignalGenerator()
         
-        # Generate signals for the last 30 days
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=30)
+        # Generate signals for the last 30 days (720 hours)
+        print("📊 Generating signals from last 30 days of available data")
         
-        print(f"📊 Generating signals from {start_date.date()} to {end_date.date()}")
+        # Generate signals using the correct method signature
+        signals = signal_generator.generate_signals(lookback_hours=720)  # 30 days
         
-        # Generate signals
-        results = signal_generator.generate_signals(start_date, end_date)
-        
-        if results['success']:
-            print(f"✅ Successfully generated {results['signals_generated']} signals")
-            print(f"📈 Buy signals: {results['buy_signals']}")
-            print(f"📉 Sell signals: {results['sell_signals']}")
+        if signals:
+            buy_signals = sum(1 for signal in signals if signal and signal.signal_type == 'BUY')
+            sell_signals = sum(1 for signal in signals if signal and signal.signal_type == 'SELL')
+            
+            print(f"✅ Successfully generated {len(signals)} signals")
+            print(f"📈 Buy signals: {buy_signals}")
+            print(f"📉 Sell signals: {sell_signals}")
             return True
         else:
-            print(f"❌ Signal generation failed: {results['message']}")
-            return False
+            print("⚠️ No signals generated - this may be normal if no crossovers occurred")
+            return True  # Don't fail setup for this
             
     except Exception as e:
         print(f"❌ Error generating initial signals: {e}")
@@ -98,7 +104,9 @@ def validate_signal_generation():
         
         for signal in latest_signals:
             signal_type = "📈 BUY" if signal.signal_type == 'BUY' else "📉 SELL"
-            print(f"  {signal_type} - {signal.timestamp} - Price: ₹{signal.price} - Confidence: {signal.confidence}%")
+            timestamp = getattr(signal, 'timestamp', None) or getattr(signal, 'signal_time', None)
+            confidence = getattr(signal, 'confidence', None) or getattr(signal, 'confidence_score', None) or 0
+            print(f"  {signal_type} - {timestamp} - Price: ₹{signal.price} - Confidence: {confidence}%")
         
         return True
         

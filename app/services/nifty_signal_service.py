@@ -89,7 +89,10 @@ class NiftySignalGenerator:
     
     def get_nifty_data(self, start_time=None, limit=1000):
         """Get NIFTY price data from database"""
-        query = NiftyPrice.query.filter_by(symbol='NIFTY')
+        # Try both 'NIFTY' and 'NIFTY 50' as symbols
+        query = NiftyPrice.query.filter(
+            (NiftyPrice.symbol == 'NIFTY') | (NiftyPrice.symbol == 'NIFTY 50')
+        )
         
         if start_time:
             query = query.filter(NiftyPrice.timestamp >= start_time)
@@ -100,6 +103,8 @@ class NiftySignalGenerator:
         if not nifty_data:
             self.logger.warning("No NIFTY data found in database")
             return None
+        
+        self.logger.info(f"Found {len(nifty_data)} NIFTY price records")
         
         # Convert to DataFrame
         df = pd.DataFrame([{
