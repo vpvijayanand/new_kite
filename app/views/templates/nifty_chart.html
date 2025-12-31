@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}NIFTY Index Chart - 30min MACD Analysis{% endblock %}
+{% block title %}NIFTY Index Chart - Multi-Timeframe MACD Analysis{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -106,8 +106,8 @@
                 <h1 class="display-5 mb-2">
                     <i class="fas fa-chart-candlestick me-3"></i>NIFTY Index Chart
                 </h1>
-                <p class="lead mb-0">30-Minute Timeframe with MACD Analysis</p>
-                <small>Real-time Buy/Sell Signals • MACD(12,26,9) • Auto-refresh every 30 minutes</small>
+                <p class="lead mb-0">Multi-Timeframe MACD Analysis</p>
+                <small>Real-time Buy/Sell Signals • MACD(12,26,9) • Default: 15-minute intervals</small>
             </div>
             <div>
                 <button class="btn btn-outline-success me-2" onclick="refreshChart()" id="refreshBtn">
@@ -202,7 +202,7 @@
             <div class="card bg-dark text-white">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">
-                        <i class="fas fa-chart-candlestick me-2"></i>NIFTY 30-Minute Chart with MACD
+                        <i class="fas fa-chart-candlestick me-2"></i>NIFTY Chart with MACD - <span id="currentTimeframe">15 Minutes</span>
                     </h5>
                     <div class="chart-controls d-flex align-items-center">
                         <div class="form-check form-switch me-3">
@@ -210,18 +210,28 @@
                             <label class="form-check-label text-white" for="autoRefresh">Auto Refresh</label>
                         </div>
                         <select class="form-select form-select-sm me-2" id="symbolSelect" onchange="changeSymbol()">
-                            <option value="NSE:NIFTY50">NIFTY 50 Index</option>
-                            <option value="NSE:NIFTY">NIFTY Basic</option>
-                            <option value="NSE:NIFTY1!">NIFTY Futures</option>
-                            <option value="TVC:NIFTY">TVC NIFTY</option>
-                            <option value="INDEX:NIFTY">INDEX NIFTY</option>
+                            <option value="NIFTY" selected>NIFTY 50 Index</option>
+                            <option value="BANKNIFTY">Bank NIFTY</option>
+                            <option value="NIFTYIT">NIFTY IT</option>
+                            <option value="NIFTYPHARMA">NIFTY Pharma</option>
+                            <option value="NIFTYAUTO">NIFTY Auto</option>
                         </select>
                         <select class="form-select form-select-sm me-2" id="timeframeSelect" onchange="changeTimeframe()">
+                            <option value="1">1 Minute</option>
+                            <option value="3">3 Minutes</option>
+                            <option value="5">5 Minutes</option>
+                            <option value="10">10 Minutes</option>
+                            <option value="15" selected>15 Minutes</option>
                             <option value="30">30 Minutes</option>
-                            <option value="15">15 Minutes</option>
                             <option value="60">1 Hour</option>
+                            <option value="240">4 Hours</option>
                             <option value="D">Daily</option>
+                            <option value="W">Weekly</option>
+                            <option value="M">Monthly</option>
                         </select>
+                        <button class="btn btn-outline-warning btn-sm" onclick="debugChart()">
+                            <i class="fas fa-bug me-1"></i>Debug
+                        </button>
                     </div>
                 </div>
                 <div class="card-body p-0">
@@ -278,7 +288,7 @@
                             • Fast EMA: 12 periods<br>
                             • Slow EMA: 26 periods<br>
                             • Signal EMA: 9 periods<br>
-                            • Timeframe: 30 minutes
+                            • Timeframe: Flexible (1min to Monthly)
                         </small>
                     </div>
                     <div class="alert alert-warning">
@@ -295,54 +305,257 @@
 {% endblock %}
 
 {% block extra_js %}
-<!-- TradingView Charting Library -->
-<script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+<!-- Plotly.js for Python-based charting -->
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 
 <script>
-let chart;
 let refreshInterval;
+let currentTimeframe = '15';
 
-// Initialize TradingView Chart
-function initChart(symbolOverride = null) {
-    // Try different NIFTY symbol formats
-    const niftySymbols = [
-        "NSE:NIFTY50",     // NIFTY 50 Index
-        "NSE:NIFTY",       // Basic NIFTY
-        "NSE:NIFTY1!",     // NIFTY Futures
-        "TVC:NIFTY",       // TradingView NIFTY
-        "INDEX:NIFTY"      // Index format
-    ];
+// Initialize Python-based Chart
+function initChart() {
+    console.log('🚀 Initializing Python-based NIFTY chart...');
     
-    const selectedSymbol = symbolOverride || niftySymbols[0];
+    // Check if Plotly is loaded
+    if (typeof Plotly === 'undefined') {
+        console.error('❌ Plotly.js is not loaded!');
+        showChartError('Plotly.js library not loaded. Please refresh the page.');
+        return;
+    }
     
-    chart = new TradingView.widget({
-        "width": "100%",
-        "height": 600,
-        "symbol": selectedSymbol,
-        "interval": "30",
-        "timezone": "Asia/Kolkata",
-        "theme": "dark",
-        "style": "1",
-        "locale": "en",
-        "toolbar_bg": "#f1f3f6",
-        "enable_publishing": false,
-        "allow_symbol_change": true,  // Allow users to change symbol if needed
-        "container_id": "tradingview_chart",
-        "studies": [
-            "MACD@tv-basicstudies"
-        ],
-        "overrides": {
-            "mainSeriesProperties.candleStyle.upColor": "#26a69a",
-            "mainSeriesProperties.candleStyle.downColor": "#ef5350",
-            "mainSeriesProperties.candleStyle.borderUpColor": "#26a69a",
-            "mainSeriesProperties.candleStyle.borderDownColor": "#ef5350",
-            "mainSeriesProperties.candleStyle.wickUpColor": "#26a69a",
-            "mainSeriesProperties.candleStyle.wickDownColor": "#ef5350"
-        },
-        "onChartReady": function() {
-            console.log('Chart loaded with symbol:', selectedSymbol);
+    console.log('✅ Plotly.js is loaded, version:', Plotly.version);
+    
+    // Show loading state
+    const container = document.getElementById('tradingview_chart');
+    if (!container) {
+        console.error('❌ Chart container #tradingview_chart not found!');
+        return;
+    }
+    
+    container.innerHTML = `
+        <div class="d-flex justify-content-center align-items-center text-white" style="height: 600px; background: #1a1a1a;">
+            <div class="text-center">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <h5>Loading NIFTY Chart & MACD...</h5>
+                <p>Generating candlestick chart with MACD analysis</p>
+            </div>
+        </div>
+    `;
+    
+    // Load chart data from Python backend
+    console.log('📡 Starting data load...');
+    loadChartData();
+}
+
+// Load chart data from Python backend
+async function loadChartData() {
+    try {
+        const timeframe = document.getElementById('timeframeSelect').value;
+        const symbol = document.getElementById('symbolSelect').value || 'NIFTY';
+        
+        console.log(`🔄 Loading chart data for ${symbol} with ${timeframe} minute timeframe`);
+        
+        // Fetch chart data from Python backend
+        const response = await fetch(`/api/nifty-chart-data?timeframe=${timeframe}&symbol=${symbol}`, {
+            method: 'GET',
+            headers: {
+                'Cache-Control': 'no-cache',
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        console.log(`📡 API Response Status: ${response.status}`);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('API Error Response:', errorText);
+            throw new Error(`HTTP ${response.status}: ${errorText}`);
         }
-    });
+        
+        const chartData = await response.json();
+        console.log('📊 Chart data received:', chartData);
+        console.log('Data structure:', {
+            success: chartData.success,
+            hasData: !!chartData.data,
+            dataKeys: chartData.data ? Object.keys(chartData.data) : 'No data',
+            timestampsLength: chartData.data?.timestamps?.length || 0
+        });
+        
+        if (chartData.success && chartData.data) {
+            console.log('✅ Calling renderChart with data...');
+            renderChart(chartData.data);
+        } else {
+            console.error('❌ Invalid chart data structure:', chartData);
+            throw new Error(chartData.error || 'Failed to load chart data - invalid response structure');
+        }
+        
+    } catch (error) {
+        console.error('💥 Error loading chart data:', error);
+        showChartError(`Chart Loading Failed: ${error.message}`);
+    }
+}
+
+// Render chart using Plotly.js
+function renderChart(data) {
+    console.log('🎨 Starting chart render with data:', data);
+    
+    const container = document.getElementById('tradingview_chart');
+    
+    if (!container) {
+        console.error('❌ Chart container not found!');
+        return;
+    }
+    
+    try {
+        // Validate data structure
+        if (!data.timestamps || !Array.isArray(data.timestamps) || data.timestamps.length === 0) {
+            throw new Error('Invalid or empty timestamps data');
+        }
+        
+        console.log(`📈 Rendering chart with ${data.timestamps.length} data points`);
+        
+        // Prepare candlestick data
+        const candlestickTrace = {
+            x: data.timestamps,
+            open: data.open,
+            high: data.high,
+            low: data.low,
+            close: data.close,
+            type: 'candlestick',
+            name: 'NIFTY',
+            increasing: {
+                line: { color: '#26a69a' }
+            },
+            decreasing: {
+                line: { color: '#ef5350' }
+            },
+            xaxis: 'x',
+            yaxis: 'y'
+        };
+        
+        // Prepare MACD data
+        const macdTrace = {
+            x: data.timestamps,
+            y: data.macd_line,
+            type: 'scatter',
+            mode: 'lines',
+            name: 'MACD Line',
+            line: { color: '#00bcd4', width: 2 },
+            xaxis: 'x',
+            yaxis: 'y2'
+        };
+        
+        const signalTrace = {
+            x: data.timestamps,
+            y: data.signal_line,
+            type: 'scatter',
+            mode: 'lines',
+            name: 'Signal Line',
+            line: { color: '#ff9800', width: 2 },
+            xaxis: 'x',
+            yaxis: 'y2'
+        };
+        
+        const histogramTrace = {
+            x: data.timestamps,
+            y: data.histogram,
+            type: 'bar',
+            name: 'MACD Histogram',
+            marker: {
+                color: data.histogram.map(val => val >= 0 ? '#4caf50' : '#f44336')
+            },
+            xaxis: 'x',
+            yaxis: 'y2'
+        };
+        
+        // Layout configuration
+        const layout = {
+            title: {
+                text: `NIFTY ${currentTimeframe} Minutes Chart with MACD`,
+                font: { color: '#ffffff', size: 16 }
+            },
+            paper_bgcolor: '#1a1a1a',
+            plot_bgcolor: '#1a1a1a',
+            font: { color: '#ffffff' },
+            showlegend: true,
+            legend: {
+                x: 0,
+                y: 1,
+                bgcolor: 'rgba(0,0,0,0.5)'
+            },
+            xaxis: {
+                domain: [0, 1],
+                anchor: 'y2',
+                gridcolor: '#444444',
+                color: '#ffffff'
+            },
+            yaxis: {
+                domain: [0.3, 1],
+                title: 'Price (₹)',
+                gridcolor: '#444444',
+                color: '#ffffff'
+            },
+            yaxis2: {
+                domain: [0, 0.25],
+                title: 'MACD',
+                gridcolor: '#444444',
+                color: '#ffffff'
+            },
+            margin: { l: 60, r: 40, t: 60, b: 40 }
+        };
+        
+        const config = {
+            responsive: true,
+            displayModeBar: true,
+            modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d'],
+            displaylogo: false
+        };
+        
+        // Clear container and render chart
+        console.log('🏗️ Clearing container and rendering with Plotly...');
+        container.innerHTML = '';
+        
+        console.log('📊 Plotly traces prepared:', {
+            candlestick: !!candlestickTrace,
+            macd: !!macdTrace,
+            signal: !!signalTrace,
+            histogram: !!histogramTrace
+        });
+        
+        Plotly.newPlot(container, [candlestickTrace, macdTrace, signalTrace, histogramTrace], layout, config)
+            .then(() => {
+                console.log('✅ Python-based chart rendered successfully');
+                // Update current timeframe display
+                document.getElementById('currentTimeframe').textContent = `${currentTimeframe} Minutes`;
+            })
+            .catch((plotlyError) => {
+                console.error('💥 Plotly rendering error:', plotlyError);
+                showChartError(`Plotly Error: ${plotlyError.message}`);
+            });
+        
+    } catch (error) {
+        console.error('💥 Error in renderChart function:', error);
+        showChartError(`Render Error: ${error.message}`);
+    }
+}
+
+// Show chart error
+function showChartError(errorMessage) {
+    const container = document.getElementById('tradingview_chart');
+    container.innerHTML = `
+        <div class="d-flex justify-content-center align-items-center text-white" style="height: 600px; background: #1a1a1a;">
+            <div class="text-center">
+                <i class="fas fa-exclamation-triangle fa-3x mb-3 text-warning"></i>
+                <h5>Chart Loading Error</h5>
+                <p>${errorMessage}</p>
+                <button onclick="initChart()" class="btn btn-primary">
+                    <i class="fas fa-sync-alt me-2"></i>Retry
+                </button>
+            </div>
+        </div>
+    `;
 }
 
 // Refresh chart
@@ -365,7 +578,7 @@ function refreshChart() {
 async function refreshCurrentData() {
     try {
         // Get current NIFTY price
-        const response = await fetch('/market/api/current-nifty');
+        const response = await fetch('/api/current-nifty');
         const data = await response.json();
         
         if (data.price) {
@@ -401,12 +614,24 @@ async function refreshCurrentData() {
 async function refreshMACDData() {
     try {
         const timeframe = document.getElementById('timeframeSelect').value;
+        console.log('Fetching MACD data for timeframe:', timeframe);
         
-        // Get MACD analysis
-        const macdResponse = await fetch(`/market/api/macd-analysis?timeframe=${timeframe}`);
+        // Get MACD analysis with error handling
+        const macdResponse = await fetch(`/api/macd-analysis?timeframe=${timeframe}`, {
+            method: 'GET',
+            headers: {
+                'Cache-Control': 'no-cache'
+            }
+        });
+        
+        if (!macdResponse.ok) {
+            throw new Error(`HTTP error! status: ${macdResponse.status}`);
+        }
+        
         const macdData = await macdResponse.json();
+        console.log('MACD response:', macdData);
         
-        if (macdData.success) {
+        if (macdData.success && macdData.macd_data) {
             const macd = macdData.macd_data;
             
             // Update MACD values
@@ -449,7 +674,7 @@ async function refreshMACDData() {
         }
         
         // Get signal statistics
-        const statsResponse = await fetch('/market/api/signal-stats');
+        const statsResponse = await fetch('/api/signal-stats');
         const statsData = await statsResponse.json();
         
         if (statsData.success) {
@@ -459,11 +684,20 @@ async function refreshMACDData() {
         
     } catch (error) {
         console.error('Error refreshing MACD data:', error);
-        // Fallback to neutral state
+        
+        // Show error state in UI
+        document.getElementById('macdLine').textContent = 'Error';
+        document.getElementById('signalLine').textContent = 'Error';
+        document.getElementById('histogram').textContent = 'Error';
         document.getElementById('macdSignal').textContent = 'ERROR';
         document.getElementById('signalStrength').textContent = 'Data unavailable';
         document.getElementById('macdSignalCard').className = 'card h-100 neutral-signal';
     }
+}
+
+// Alias for refreshMACDData for chart callback
+function loadMACDData() {
+    refreshMACDData();
 }
 
 // Update signal history display
@@ -524,86 +758,36 @@ async function refreshMACDSignals() {
 // Change timeframe
 function changeTimeframe() {
     const timeframe = document.getElementById('timeframeSelect').value;
+    const timeframeSelect = document.getElementById('timeframeSelect');
+    const selectedText = timeframeSelect.options[timeframeSelect.selectedIndex].text;
     
-    // Recreate chart with new timeframe
-    if (chart) {
-        chart.remove();
-    }
+    // Update the current timeframe display and global variable
+    document.getElementById('currentTimeframe').textContent = selectedText;
+    currentTimeframe = timeframe;
     
-    // Use the same symbol selection logic
-    const niftySymbols = [
-        "NSE:NIFTY50",     // NIFTY 50 Index
-        "NSE:NIFTY",       // Basic NIFTY
-        "NSE:NIFTY1!",     // NIFTY Futures
-        "TVC:NIFTY",       // TradingView NIFTY
-        "INDEX:NIFTY"      // Index format
-    ];
+    console.log(`Changing timeframe to ${timeframe} minutes`);
     
-    chart = new TradingView.widget({
-        "width": "100%",
-        "height": 600,
-        "symbol": niftySymbols[0],
-        "interval": timeframe,
-        "timezone": "Asia/Kolkata",
-        "theme": "dark",
-        "style": "1",
-        "locale": "en",
-        "toolbar_bg": "#f1f3f6",
-        "enable_publishing": false,
-        "allow_symbol_change": true,
-        "container_id": "tradingview_chart",
-        "studies": [
-            "MACD@tv-basicstudies"
-        ],
-        "overrides": {
-            "mainSeriesProperties.candleStyle.upColor": "#26a69a",
-            "mainSeriesProperties.candleStyle.downColor": "#ef5350",
-            "mainSeriesProperties.candleStyle.borderUpColor": "#26a69a",
-            "mainSeriesProperties.candleStyle.borderDownColor": "#ef5350",
-            "mainSeriesProperties.candleStyle.wickUpColor": "#26a69a",
-            "mainSeriesProperties.candleStyle.wickDownColor": "#ef5350"
-        }
-    });
+    // Reload chart with new timeframe
+    loadChartData();
+    
+    // Also refresh MACD data
+    setTimeout(() => {
+        loadMACDData();
+    }, 1000);
 }
 
 // Change symbol
 function changeSymbol() {
     const symbol = document.getElementById('symbolSelect').value;
-    const timeframe = document.getElementById('timeframeSelect').value;
+    console.log(`Changing symbol to ${symbol}`);
     
-    // Recreate chart with new symbol
-    if (chart) {
-        chart.remove();
-    }
+    // Reload chart with new symbol
+    loadChartData();
     
-    chart = new TradingView.widget({
-        "width": "100%",
-        "height": 600,
-        "symbol": symbol,
-        "interval": timeframe,
-        "timezone": "Asia/Kolkata",
-        "theme": "dark",
-        "style": "1",
-        "locale": "en",
-        "toolbar_bg": "#f1f3f6",
-        "enable_publishing": false,
-        "allow_symbol_change": true,
-        "container_id": "tradingview_chart",
-        "studies": [
-            "MACD@tv-basicstudies"
-        ],
-        "overrides": {
-            "mainSeriesProperties.candleStyle.upColor": "#26a69a",
-            "mainSeriesProperties.candleStyle.downColor": "#ef5350",
-            "mainSeriesProperties.candleStyle.borderUpColor": "#26a69a",
-            "mainSeriesProperties.candleStyle.borderDownColor": "#ef5350",
-            "mainSeriesProperties.candleStyle.wickUpColor": "#26a69a",
-            "mainSeriesProperties.candleStyle.wickDownColor": "#ef5350"
-        },
-        "onChartReady": function() {
-            console.log('Chart loaded with symbol:', symbol);
-        }
-    });
+    // Also refresh MACD data
+    setTimeout(() => {
+        loadMACDData();
+    }, 1000);
 }
 
 // Show MACD info modal
@@ -632,22 +816,141 @@ function showMACDInfo() {
 - Consider overall market sentiment`);
 }
 
-// Initialize page
-document.addEventListener('DOMContentLoaded', async function() {
-    // Initialize chart
-    initChart();
+// Debug function
+function debugChart() {
+    console.log('🐛 DEBUG: Checking chart status...');
     
-    // Initial data load
-    await refreshCurrentData();
-    await refreshMACDSignals();
+    // Check DOM elements
+    console.log('Chart container exists:', !!document.getElementById('tradingview_chart'));
+    console.log('Timeframe select exists:', !!document.getElementById('timeframeSelect'));
+    console.log('Symbol select exists:', !!document.getElementById('symbolSelect'));
     
-    // Set up auto-refresh
-    refreshInterval = setInterval(() => {
-        if (document.getElementById('autoRefresh').checked) {
-            refreshCurrentData();
-            refreshMACDSignals();
+    // Check Plotly
+    console.log('Plotly available:', typeof Plotly !== 'undefined');
+    if (typeof Plotly !== 'undefined') {
+        console.log('Plotly version:', Plotly.version);
+    }
+    
+    // Check current values
+    console.log('Current timeframe:', document.getElementById('timeframeSelect')?.value);
+    console.log('Current symbol:', document.getElementById('symbolSelect')?.value);
+    console.log('Current timeframe var:', currentTimeframe);
+    
+    // Test basic Plotly functionality
+    console.log('🧪 Testing basic Plotly rendering...');
+    const container = document.getElementById('tradingview_chart');
+    
+    if (container && typeof Plotly !== 'undefined') {
+        // Create a simple test chart
+        const testData = [{
+            x: ['2025-01-01', '2025-01-02', '2025-01-03'],
+            y: [100, 200, 150],
+            type: 'scatter',
+            mode: 'lines',
+            name: 'Test Line'
+        }];
+        
+        const testLayout = {
+            title: 'Test Chart - If you see this, Plotly works!',
+            paper_bgcolor: '#1a1a1a',
+            plot_bgcolor: '#1a1a1a',
+            font: { color: '#ffffff' }
+        };
+        
+        Plotly.newPlot(container, testData, testLayout)
+            .then(() => {
+                console.log('✅ Basic Plotly test successful!');
+                console.log('🚀 Now trying real data...');
+                setTimeout(loadChartData, 2000);
+            })
+            .catch(error => {
+                console.error('❌ Basic Plotly test failed:', error);
+            });
+    } else {
+        console.log('🚀 Force loading chart data anyway...');
+        loadChartData();
+    }
+}
+
+// Simple force load function
+function forceLoadChart() {
+    console.log('🚀 FORCE: Starting chart load...');
+    
+    const container = document.getElementById('tradingview_chart');
+    if (!container) {
+        console.error('❌ FORCE: Chart container not found');
+        return;
+    }
+    
+    console.log('📊 FORCE: Making API call...');
+    fetch('/api/nifty-chart-data?timeframe=15&symbol=NIFTY')
+        .then(response => {
+            console.log('📡 FORCE: API response received');
+            return response.json();
+        })
+        .then(data => {
+            console.log('📊 FORCE: Data received, rendering...');
+            if (data.success && data.data) {
+                renderChart(data.data);
+            } else {
+                console.error('❌ FORCE: Invalid data');
+            }
+        })
+        .catch(error => {
+            console.error('💥 FORCE: API error:', error);
+        });
+}
+
+// Wait for everything to load then initialize
+function waitForPlotlyAndInit() {
+    console.log('⏳ Waiting for Plotly to load...');
+    
+    if (typeof Plotly !== 'undefined') {
+        console.log('✅ Plotly loaded, trying simple approach...');
+        try {
+            // Use simple force load instead of complex init
+            forceLoadChart();
+        } catch (error) {
+            console.error('💥 Error in forceLoadChart:', error);
         }
-    }, 30000); // Refresh every 30 seconds
+    } else {
+        console.log('⏳ Plotly not ready, retrying in 500ms...');
+        setTimeout(waitForPlotlyAndInit, 500);
+    }
+}
+
+// Initialize page  
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🌟 DOM Content Loaded - Starting initialization...');
+    
+    try {
+        // Wait for Plotly to load, then initialize
+        waitForPlotlyAndInit();
+        
+        // Set up auto-refresh (without dependencies)
+        setTimeout(() => {
+            try {
+                refreshInterval = setInterval(() => {
+                    try {
+                        if (document.getElementById('autoRefresh') && document.getElementById('autoRefresh').checked) {
+                            console.log('🔄 Auto-refreshing...');
+                            if (document.getElementById('currentPrice')) {
+                                refreshCurrentData().catch(e => console.error('Auto-refresh error:', e));
+                            }
+                        }
+                    } catch (refreshError) {
+                        console.error('💥 Auto-refresh error:', refreshError);
+                    }
+                }, 30000); // Refresh every 30 seconds
+            } catch (intervalError) {
+                console.error('💥 Interval setup error:', intervalError);
+            }
+        }, 2000);
+        
+        console.log('✅ Event listeners setup complete!');
+    } catch (domError) {
+        console.error('💥 DOM initialization error:', domError);
+    }
 });
 
 // Cleanup on page unload

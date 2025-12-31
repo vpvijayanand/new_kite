@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MACD Test</title>
+    <style>
+        .signal-badge {
+            display: inline-block;
+            padding: 10px;
+            margin: 5px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            min-width: 80px;
+            text-align: center;
+        }
+        .buy { background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; }
+        .sell { background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%); color: white; }
+        .bullish { background: linear-gradient(135deg, #17a2b8 0%, #138496 100%); color: white; }
+        .bearish { background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%); color: black; }
+        .neutral { background: rgba(108, 117, 125, 0.3); color: #6c757d; }
+    </style>
+</head>
+<body>
+    <h2>MACD Signal Test</h2>
+    <div id="signals"></div>
+    
+    <script>
+        async function testMacdSignals() {
+            const timeframes = [3, 6, 12, 15, 30];
+            const signalsDiv = document.getElementById('signals');
+            
+            for (const tf of timeframes) {
+                try {
+                    const response = await fetch(`/api/macd-signal?symbol=NIFTY&timeframe=${tf}`);
+                    const data = await response.json();
+                    
+                    const badge = document.createElement('div');
+                    badge.className = 'signal-badge';
+                    
+                    if (data.signal) {
+                        switch(data.signal.toLowerCase()) {
+                            case 'buy': badge.classList.add('buy'); break;
+                            case 'sell': badge.classList.add('sell'); break;
+                            case 'bullish': badge.classList.add('bullish'); break;
+                            case 'bearish': badge.classList.add('bearish'); break;
+                            default: badge.classList.add('neutral');
+                        }
+                    }
+                    
+                    const time = data.timestamp ? new Date(data.timestamp) : null;
+                    const timeStr = time ? 
+                        `${time.getDate().toString().padStart(2, '0')}-${(time.getMonth() + 1).toString().padStart(2, '0')} : ${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}` 
+                        : '--';
+                    
+                    badge.innerHTML = `
+                        <div><strong>${tf}m</strong></div>
+                        <div>${data.signal || 'ERROR'}</div>
+                        <div><small>${timeStr}</small></div>
+                    `;
+                    
+                    signalsDiv.appendChild(badge);
+                    
+                } catch (error) {
+                    console.error(`Error for ${tf}min:`, error);
+                    const badge = document.createElement('div');
+                    badge.className = 'signal-badge neutral';
+                    badge.innerHTML = `
+                        <div><strong>${tf}m</strong></div>
+                        <div>ERR</div>
+                        <div><small>--</small></div>
+                    `;
+                    signalsDiv.appendChild(badge);
+                }
+            }
+        }
+        
+        // Run test when page loads
+        testMacdSignals();
+    </script>
+</body>
+</html>

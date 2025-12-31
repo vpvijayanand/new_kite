@@ -170,7 +170,7 @@ class TechnicalAnalysisService:
             self.logger.error(f"Error getting 30min NIFTY data: {str(e)}")
             return []
     
-    def get_nifty_macd_analysis(self, timeframe_minutes=30):
+    def get_nifty_macd_analysis(self, timeframe_minutes=15):
         """Get complete MACD analysis for NIFTY"""
         try:
             # Get price data based on timeframe
