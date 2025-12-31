@@ -122,6 +122,16 @@ def init_scheduler(app):
             strategy_1_monitor_job.app = app
         except:
             pass  # Ignore if strategy job function is not available
+    
+    # Initialize signal generation scheduler
+    try:
+        from app.services.signal_scheduler import init_signal_scheduler
+        init_signal_scheduler(app)
+        print("✅ Signal generation scheduler initialized successfully")
+    except ImportError as ie:
+        print(f"⚠️ Signal scheduler not available: {str(ie)}")
+    except Exception as e:
+        print(f"⚠️ Signal scheduler initialization warning: {str(e)}")
 
 @market_bp.route('/')
 def index():

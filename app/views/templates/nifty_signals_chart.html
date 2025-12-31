@@ -1,0 +1,660 @@
+{% extends "base.html" %}
+
+{% block title %}NIFTY Chart with Trading Signals{% endblock %}
+
+{% block extra_css %}
+<style>
+.chart-container {
+    position: relative;
+    height: 600px;
+    margin-bottom: 2rem;
+}
+
+.signal-overlay {
+    position: absolute;
+    z-index: 10;
+    pointer-events: none;
+}
+
+.buy-signal {
+    background-color: #28a745;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: bold;
+}
+
+.sell-signal {
+    background-color: #dc3545;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: bold;
+}
+
+.ma-legend {
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 10px;
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 0.85rem;
+    z-index: 5;
+}
+
+.ma-legend-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 5px;
+}
+
+.ma-legend-color {
+    width: 20px;
+    height: 3px;
+    margin-right: 8px;
+    border-radius: 2px;
+}
+
+.chart-controls {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+/* Auto-refresh controls */
+.refresh-controls {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+    background: white;
+    border-radius: 8px;
+    padding: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    border: 1px solid #dee2e6;
+}
+
+.signal-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.stat-item {
+    text-align: center;
+    padding: 10px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #007bff 0%, #6610f2 100%);
+    color: white;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    .chart-container {
+        height: 400px;
+    }
+    
+    .ma-legend {
+        position: static;
+        margin-bottom: 10px;
+    }
+    
+    .refresh-controls {
+        position: static;
+        margin-bottom: 15px;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Refresh Controls -->
+    <div class="refresh-controls">
+        <div class="d-flex align-items-center gap-2">
+            <button class="btn btn-sm btn-success" onclick="loadChartData()">
+                <i class="fas fa-sync"></i>
+            </button>
+            <span class="text-muted" id="lastUpdated">Loading...</span>
+        </div>
+        <div class="form-check form-switch mt-2">
+            <input class="form-check-input" type="checkbox" id="autoRefresh" checked>
+            <label class="form-check-label" for="autoRefresh">Auto-refresh</label>
+        </div>
+    </div>
+    
+    <!-- Header -->
+    <div class="row mb-3">
+        <div class="col-12">
+            <h1 class="h3 mb-0">📈 NIFTY Chart with Trading Signals</h1>
+            <p class="text-muted">Fast MA (12) vs Slow MA (27) Crossover Strategy</p>
+        </div>
+    </div>
+    
+    <!-- Chart Controls -->
+    <div class="chart-controls">
+        <div class="row align-items-center">
+            <div class="col-md-3">
+                <label for="timeframe" class="form-label">Timeframe:</label>
+                <select class="form-control" id="timeframe">
+                    <option value="1">1 Hour</option>
+                    <option value="3">3 Hours</option>
+                    <option value="6" selected>6 Hours</option>
+                    <option value="12">12 Hours</option>
+                    <option value="24">24 Hours</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Chart Type:</label>
+                <div class="btn-group btn-group-sm w-100" role="group">
+                    <input type="radio" class="btn-check" name="chartType" id="candlestick" value="candlestick" checked>
+                    <label class="btn btn-outline-primary" for="candlestick">Candlestick</label>
+                    
+                    <input type="radio" class="btn-check" name="chartType" id="line" value="line">
+                    <label class="btn btn-outline-primary" for="line">Line</label>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Show Signals:</label>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="showSignals" checked>
+                    <label class="form-check-label" for="showSignals">Signal Markers</label>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">&nbsp;</label>
+                <div class="d-grid">
+                    <button class="btn btn-primary" onclick="loadChartData()">
+                        <i class="fas fa-chart-line me-1"></i>Update Chart
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Signal Statistics -->
+    <div class="signal-stats" id="signalStats">
+        <div class="stat-item">
+            <div class="fw-bold" id="totalSignals">-</div>
+            <div class="small">Total Signals</div>
+        </div>
+        <div class="stat-item" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%);">
+            <div class="fw-bold" id="buySignals">-</div>
+            <div class="small">Buy Signals</div>
+        </div>
+        <div class="stat-item" style="background: linear-gradient(135deg, #dc3545 0%, #e83e8c 100%);">
+            <div class="fw-bold" id="sellSignals">-</div>
+            <div class="small">Sell Signals</div>
+        </div>
+        <div class="stat-item" style="background: linear-gradient(135deg, #fd7e14 0%, #ffc107 100%);">
+            <div class="fw-bold" id="latestSignal">-</div>
+            <div class="small">Latest Signal</div>
+        </div>
+    </div>
+    
+    <!-- Chart Container -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">NIFTY Price Chart with Moving Averages</h5>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-primary btn-sm" onclick="generateSignals()">
+                            <i class="fas fa-magic me-1"></i>Generate Signals
+                        </button>
+                        <a href="/signals/" class="btn btn-outline-info btn-sm">
+                            <i class="fas fa-table me-1"></i>View Table
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Loading State -->
+                    <div id="chartLoading" class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2">Loading chart data...</p>
+                    </div>
+                    
+                    <!-- Chart -->
+                    <div class="chart-container" style="display: none;" id="chartContainer">
+                        <canvas id="niftyChart"></canvas>
+                        
+                        <!-- MA Legend -->
+                        <div class="ma-legend">
+                            <div class="fw-bold mb-2">Moving Averages</div>
+                            <div class="ma-legend-item">
+                                <div class="ma-legend-color" style="background-color: #007bff;"></div>
+                                <span>NIFTY Price</span>
+                            </div>
+                            <div class="ma-legend-item">
+                                <div class="ma-legend-color" style="background-color: #28a745;"></div>
+                                <span>Fast MA (12)</span>
+                            </div>
+                            <div class="ma-legend-item">
+                                <div class="ma-legend-color" style="background-color: #dc3545;"></div>
+                                <span>Slow MA (27)</span>
+                            </div>
+                            <div class="ma-legend-item">
+                                <div class="ma-legend-color" style="background-color: #6f42c1;"></div>
+                                <span>Very Slow MA (189)</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Error State -->
+                    <div id="chartError" class="text-center py-5" style="display: none;">
+                        <i class="fas fa-exclamation-triangle fa-3x text-warning mb-3"></i>
+                        <h5>Unable to Load Chart</h5>
+                        <p class="text-muted" id="errorMessage">Please try again later.</p>
+                        <button class="btn btn-primary" onclick="loadChartData()">
+                            <i class="fas fa-retry me-1"></i>Retry
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Recent Signals Table -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">🔔 Recent Trading Signals</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Signal</th>
+                                    <th>Price</th>
+                                    <th>Fast MA</th>
+                                    <th>Slow MA</th>
+                                    <th>Difference</th>
+                                    <th>Confidence</th>
+                                    <th>Trend</th>
+                                </tr>
+                            </thead>
+                            <tbody id="signalsTable">
+                                <tr>
+                                    <td colspan="8" class="text-center text-muted">Loading signals...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+
+<script>
+let niftyChart = null;
+let autoRefreshInterval = null;
+let chartData = null;
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+    loadChartData();
+    startAutoRefresh();
+    
+    // Event listeners
+    document.getElementById('timeframe').addEventListener('change', loadChartData);
+    document.getElementById('autoRefresh').addEventListener('change', toggleAutoRefresh);
+    document.querySelectorAll('input[name="chartType"]').forEach(radio => {
+        radio.addEventListener('change', updateChartDisplay);
+    });
+    document.getElementById('showSignals').addEventListener('change', updateChartDisplay);
+});
+
+// Load chart data from API
+async function loadChartData() {
+    try {
+        showLoading(true);
+        
+        const hours = document.getElementById('timeframe').value;
+        const response = await fetch(`/signals/api/chart-data?hours=${hours}`);
+        const result = await response.json();
+        
+        if (result.success) {
+            chartData = result.data;
+            updateChartDisplay();
+            updateSignalsTable(chartData.signals);
+            updateSignalStats(chartData.signals);
+            updateLastUpdated();
+        } else {
+            showError(result.error);
+        }
+    } catch (error) {
+        console.error('Error loading chart data:', error);
+        showError('Failed to load chart data');
+    } finally {
+        showLoading(false);
+    }
+}
+
+// Update chart display
+function updateChartDisplay() {
+    if (!chartData) return;
+    
+    const chartType = document.querySelector('input[name="chartType"]:checked').value;
+    const showSignals = document.getElementById('showSignals').checked;
+    
+    if (chartType === 'candlestick') {
+        updateCandlestickChart(showSignals);
+    } else {
+        updateLineChart(showSignals);
+    }
+}
+
+// Update line chart
+function updateLineChart(showSignals) {
+    const ctx = document.getElementById('niftyChart').getContext('2d');
+    
+    if (niftyChart) {
+        niftyChart.destroy();
+    }
+    
+    const priceData = chartData.price_data;
+    const signals = chartData.signals;
+    
+    // Prepare datasets
+    const datasets = [
+        {
+            label: 'NIFTY Price',
+            data: priceData.map(item => ({
+                x: item.timestamp,
+                y: item.close
+            })),
+            borderColor: '#007bff',
+            backgroundColor: 'rgba(0, 123, 255, 0.1)',
+            borderWidth: 2,
+            fill: false
+        }
+    ];
+    
+    // Add MA lines if available
+    const maDataExists = priceData.some(item => item.fast_ma);
+    if (maDataExists) {
+        datasets.push(
+            {
+                label: 'Fast MA (12)',
+                data: priceData.map(item => ({
+                    x: item.timestamp,
+                    y: item.fast_ma
+                })),
+                borderColor: '#28a745',
+                borderWidth: 1,
+                fill: false,
+                pointRadius: 0
+            },
+            {
+                label: 'Slow MA (27)',
+                data: priceData.map(item => ({
+                    x: item.timestamp,
+                    y: item.slow_ma
+                })),
+                borderColor: '#dc3545',
+                borderWidth: 1,
+                fill: false,
+                pointRadius: 0
+            }
+        );
+        
+        // Add Very Slow MA if available
+        if (priceData.some(item => item.very_slow_ma)) {
+            datasets.push({
+                label: 'Very Slow MA (189)',
+                data: priceData.map(item => ({
+                    x: item.timestamp,
+                    y: item.very_slow_ma
+                })),
+                borderColor: '#6f42c1',
+                borderWidth: 2,
+                fill: false,
+                pointRadius: 0
+            });
+        }
+    }
+    
+    // Add signal markers
+    if (showSignals && signals.length > 0) {
+        const buySignals = signals.filter(s => s.signal_type === 'BUY');
+        const sellSignals = signals.filter(s => s.signal_type === 'SELL');
+        
+        if (buySignals.length > 0) {
+            datasets.push({
+                label: 'Buy Signals',
+                data: buySignals.map(signal => ({
+                    x: signal.signal_time,
+                    y: signal.price
+                })),
+                backgroundColor: '#28a745',
+                borderColor: '#28a745',
+                pointRadius: 8,
+                pointHoverRadius: 10,
+                showLine: false,
+                pointStyle: 'triangle'
+            });
+        }
+        
+        if (sellSignals.length > 0) {
+            datasets.push({
+                label: 'Sell Signals',
+                data: sellSignals.map(signal => ({
+                    x: signal.signal_time,
+                    y: signal.price
+                })),
+                backgroundColor: '#dc3545',
+                borderColor: '#dc3545',
+                pointRadius: 8,
+                pointHoverRadius: 10,
+                showLine: false,
+                pointStyle: 'rectRot'
+            });
+        }
+    }
+    
+    niftyChart = new Chart(ctx, {
+        type: 'line',
+        data: { datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    type: 'time',
+                    time: {
+                        displayFormats: {
+                            minute: 'HH:mm',
+                            hour: 'HH:mm'
+                        }
+                    },
+                    title: {
+                        display: true,
+                        text: 'Time'
+                    }
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: 'Price (₹)'
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.dataset.label || '';
+                            const value = context.raw.y;
+                            
+                            if (label.includes('Signal')) {
+                                return `${label}: ₹${value.toFixed(2)}`;
+                            } else {
+                                return `${label}: ₹${value.toFixed(2)}`;
+                            }
+                        }
+                    }
+                },
+                legend: {
+                    display: true,
+                    position: 'bottom'
+                }
+            },
+            interaction: {
+                mode: 'index',
+                intersect: false
+            }
+        }
+    });
+    
+    showChart(true);
+}
+
+// Update candlestick chart (simplified version using line chart)
+function updateCandlestickChart(showSignals) {
+    // For now, use line chart as candlestick requires additional library
+    updateLineChart(showSignals);
+}
+
+// Update signals table
+function updateSignalsTable(signals) {
+    const tbody = document.getElementById('signalsTable');
+    tbody.innerHTML = '';
+    
+    if (signals.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No signals found</td></tr>';
+        return;
+    }
+    
+    signals.slice(0, 10).forEach(signal => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${signal.signal_time_ist || signal.signal_time}</td>
+            <td>
+                <span class="badge ${signal.signal_type === 'BUY' ? 'bg-success' : 'bg-danger'}">
+                    ${signal.signal_type}
+                </span>
+            </td>
+            <td>₹${signal.price.toFixed(2)}</td>
+            <td>₹${signal.fast_ma ? signal.fast_ma.toFixed(2) : 'N/A'}</td>
+            <td>₹${signal.slow_ma ? signal.slow_ma.toFixed(2) : 'N/A'}</td>
+            <td class="${signal.ma_difference > 0 ? 'text-success' : 'text-danger'}">
+                ${signal.ma_difference ? signal.ma_difference.toFixed(2) : 'N/A'}
+            </td>
+            <td>
+                <div class="progress" style="height: 10px;">
+                    <div class="progress-bar ${getConfidenceColor(signal.confidence_score)}" 
+                         style="width: ${signal.confidence_score || 0}%"></div>
+                </div>
+                <small>${signal.confidence_score || 0}%</small>
+            </td>
+            <td>
+                <span class="badge ${signal.trend_direction === 'UP' ? 'bg-info' : 'bg-warning'}">
+                    ${signal.trend_direction || 'N/A'}
+                </span>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+// Update signal statistics
+function updateSignalStats(signals) {
+    const buySignals = signals.filter(s => s.signal_type === 'BUY').length;
+    const sellSignals = signals.filter(s => s.signal_type === 'SELL').length;
+    const latestSignal = signals.length > 0 ? signals[0] : null;
+    
+    document.getElementById('totalSignals').textContent = signals.length;
+    document.getElementById('buySignals').textContent = buySignals;
+    document.getElementById('sellSignals').textContent = sellSignals;
+    document.getElementById('latestSignal').textContent = latestSignal ? 
+        `${latestSignal.signal_type} ₹${latestSignal.price.toFixed(2)}` : 'None';
+}
+
+// Generate signals
+async function generateSignals() {
+    try {
+        const response = await fetch('/signals/api/generate-signals', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lookback_hours: 24 })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert(`✅ Generated ${result.signals_generated} new signals`);
+            loadChartData();
+        } else {
+            alert(`❌ Error: ${result.error}`);
+        }
+    } catch (error) {
+        console.error('Error generating signals:', error);
+        alert('❌ Failed to generate signals');
+    }
+}
+
+// Auto-refresh functionality
+function startAutoRefresh() {
+    autoRefreshInterval = setInterval(() => {
+        if (document.getElementById('autoRefresh').checked) {
+            loadChartData();
+        }
+    }, 60000); // Refresh every minute
+}
+
+function toggleAutoRefresh() {
+    const isChecked = document.getElementById('autoRefresh').checked;
+    if (!isChecked && autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+        autoRefreshInterval = null;
+    } else if (isChecked && !autoRefreshInterval) {
+        startAutoRefresh();
+    }
+}
+
+// Utility functions
+function showLoading(show) {
+    document.getElementById('chartLoading').style.display = show ? 'block' : 'none';
+}
+
+function showChart(show) {
+    document.getElementById('chartContainer').style.display = show ? 'block' : 'none';
+}
+
+function showError(message) {
+    document.getElementById('errorMessage').textContent = message;
+    document.getElementById('chartError').style.display = 'block';
+    showChart(false);
+}
+
+function updateLastUpdated() {
+    const now = new Date();
+    document.getElementById('lastUpdated').textContent = 
+        `Last updated: ${now.toLocaleTimeString()}`;
+}
+
+function getConfidenceColor(score) {
+    if (score >= 75) return 'bg-success';
+    if (score >= 50) return 'bg-warning';
+    return 'bg-danger';
+}
+</script>
+{% endblock %}

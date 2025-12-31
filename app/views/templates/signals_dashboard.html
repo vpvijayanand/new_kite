@@ -1,0 +1,511 @@
+{% extends "base.html" %}
+
+{% block title %}NIFTY Trading Signals{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Signal Dashboard Styling */
+.signal-card {
+    border-left: 4px solid #007bff;
+    transition: all 0.3s ease;
+}
+
+.signal-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.signal-buy {
+    border-left-color: #28a745 !important;
+}
+
+.signal-sell {
+    border-left-color: #dc3545 !important;
+}
+
+.signal-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+}
+
+.confidence-bar {
+    height: 6px;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.confidence-low { background-color: #dc3545; }
+.confidence-medium { background-color: #ffc107; }
+.confidence-high { background-color: #28a745; }
+
+.performance-metric {
+    text-align: center;
+    padding: 1rem;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.signal-timestamp {
+    font-size: 0.85rem;
+    color: #6c757d;
+}
+
+.price-change {
+    font-weight: bold;
+}
+
+.price-up { color: #28a745; }
+.price-down { color: #dc3545; }
+
+/* Auto-refresh styling */
+.refresh-indicator {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+    padding: 10px 15px;
+    border-radius: 25px;
+    background: linear-gradient(45deg, #007bff, #28a745);
+    color: white;
+    font-size: 0.9rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.pulse {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.6; }
+    100% { opacity: 1; }
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    .signal-card {
+        margin-bottom: 1rem;
+    }
+    
+    .performance-metric {
+        margin-bottom: 1rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Auto-refresh indicator -->
+    <div id="refreshIndicator" class="refresh-indicator">
+        <i class="fas fa-sync-alt pulse"></i>
+        <span id="refreshText">Auto-refresh: ON</span>
+    </div>
+    
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="h3 mb-0">📊 NIFTY Trading Signals</h1>
+            <p class="text-muted">Fast/Slow MA Crossover Strategy • Real-time Signal Detection</p>
+        </div>
+    </div>
+    
+    <!-- Performance Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="performance-metric">
+                <div class="h4 mb-1" id="totalSignals">-</div>
+                <div class="small">Total Signals</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="performance-metric" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%);">
+                <div class="h4 mb-1" id="buySignals">-</div>
+                <div class="small">Buy Signals</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="performance-metric" style="background: linear-gradient(135deg, #dc3545 0%, #e83e8c 100%);">
+                <div class="h4 mb-1" id="sellSignals">-</div>
+                <div class="small">Sell Signals</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="performance-metric" style="background: linear-gradient(135deg, #fd7e14 0%, #ffc107 100%);">
+                <div class="h4 mb-1" id="winRate">-%</div>
+                <div class="small">Win Rate</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Controls -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-4">
+                            <label for="filterDate" class="form-label">Filter by Date:</label>
+                            <input type="date" class="form-control" id="filterDate">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="filterType" class="form-label">Signal Type:</label>
+                            <select class="form-control" id="filterType">
+                                <option value="">All Signals</option>
+                                <option value="BUY">Buy Signals</option>
+                                <option value="SELL">Sell Signals</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="signalLimit" class="form-label">Show Last:</label>
+                            <select class="form-control" id="signalLimit">
+                                <option value="25">25 Signals</option>
+                                <option value="50" selected>50 Signals</option>
+                                <option value="100">100 Signals</option>
+                                <option value="200">200 Signals</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">&nbsp;</label>
+                            <div class="d-grid">
+                                <button class="btn btn-primary" onclick="loadSignals()">
+                                    <i class="fas fa-filter me-1"></i>Apply
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <button class="btn btn-success btn-sm me-2" onclick="generateSignals()">
+                                <i class="fas fa-magic me-1"></i>Generate New Signals
+                            </button>
+                            <button class="btn btn-info btn-sm me-2" onclick="loadSignals()">
+                                <i class="fas fa-sync me-1"></i>Refresh
+                            </button>
+                            <button class="btn btn-warning btn-sm" onclick="toggleAutoRefresh()">
+                                <i class="fas fa-pause me-1"></i><span id="autoRefreshBtn">Pause Auto-refresh</span>
+                            </button>
+                            <a href="/signals/chart" class="btn btn-outline-primary btn-sm ms-2">
+                                <i class="fas fa-chart-line me-1"></i>View Chart
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Latest Signal Alert -->
+    <div id="latestSignalAlert" class="alert alert-info" style="display: none;">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <strong>🔥 Latest Signal:</strong>
+                <span id="latestSignalText">-</span>
+            </div>
+            <button type="button" class="btn-close" onclick="hideLatestSignal()"></button>
+        </div>
+    </div>
+    
+    <!-- Signals List -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">📈 Recent Trading Signals</h5>
+                    <span class="badge bg-primary" id="signalsCount">0 signals</span>
+                </div>
+                <div class="card-body">
+                    <!-- Loading State -->
+                    <div id="loadingSpinner" class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2">Loading signals...</p>
+                    </div>
+                    
+                    <!-- Signals Container -->
+                    <div id="signalsContainer" style="display: none;">
+                        <div id="signalsList" class="row">
+                            <!-- Signals will be loaded here -->
+                        </div>
+                    </div>
+                    
+                    <!-- No Data State -->
+                    <div id="noDataMessage" class="text-center py-5" style="display: none;">
+                        <i class="fas fa-chart-line fa-3x text-muted mb-3"></i>
+                        <h5>No Signals Found</h5>
+                        <p class="text-muted">No trading signals available for the selected criteria.</p>
+                        <button class="btn btn-primary" onclick="generateSignals()">
+                            <i class="fas fa-magic me-1"></i>Generate Signals
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let autoRefreshEnabled = true;
+let autoRefreshInterval = null;
+
+// Initialize page
+document.addEventListener('DOMContentLoaded', function() {
+    // Set today's date as default
+    document.getElementById('filterDate').value = new Date().toISOString().split('T')[0];
+    
+    // Load initial data
+    loadSignals();
+    loadPerformance();
+    
+    // Start auto-refresh
+    startAutoRefresh();
+    
+    // Add event listeners
+    document.getElementById('filterDate').addEventListener('change', loadSignals);
+    document.getElementById('filterType').addEventListener('change', loadSignals);
+    document.getElementById('signalLimit').addEventListener('change', loadSignals);
+});
+
+// Load signals data
+async function loadSignals() {
+    try {
+        showLoading(true);
+        
+        const params = new URLSearchParams({
+            limit: document.getElementById('signalLimit').value,
+            date: document.getElementById('filterDate').value,
+            type: document.getElementById('filterType').value
+        });
+        
+        const response = await fetch(`/signals/api/signals?${params}`);
+        const result = await response.json();
+        
+        if (result.success) {
+            displaySignals(result.data);
+            updateSignalsCount(result.count);
+            
+            // Show latest signal if available
+            if (result.data.length > 0) {
+                showLatestSignal(result.data[0]);
+            }
+        } else {
+            showError(result.error);
+        }
+    } catch (error) {
+        console.error('Error loading signals:', error);
+        showError('Failed to load signals');
+    } finally {
+        showLoading(false);
+    }
+}
+
+// Load performance summary
+async function loadPerformance() {
+    try {
+        const response = await fetch('/signals/api/performance');
+        const result = await response.json();
+        
+        if (result.success) {
+            const performance = result.data;
+            
+            document.getElementById('totalSignals').textContent = performance.total_signals || 0;
+            document.getElementById('buySignals').textContent = performance.buy_signals || 0;
+            document.getElementById('sellSignals').textContent = performance.sell_signals || 0;
+            document.getElementById('winRate').textContent = `${(performance.win_rate || 0).toFixed(1)}%`;
+        }
+    } catch (error) {
+        console.error('Error loading performance:', error);
+    }
+}
+
+// Display signals in the UI
+function displaySignals(signals) {
+    const container = document.getElementById('signalsList');
+    container.innerHTML = '';
+    
+    if (signals.length === 0) {
+        showNoData(true);
+        return;
+    }
+    
+    showNoData(false);
+    
+    signals.forEach(signal => {
+        const signalCard = createSignalCard(signal);
+        container.appendChild(signalCard);
+    });
+    
+    showSignalsContainer(true);
+}
+
+// Create signal card element
+function createSignalCard(signal) {
+    const col = document.createElement('div');
+    col.className = 'col-md-6 col-lg-4 mb-3';
+    
+    const signalClass = signal.signal_type === 'BUY' ? 'signal-buy' : 'signal-sell';
+    const signalIcon = signal.signal_type === 'BUY' ? 'fa-arrow-up text-success' : 'fa-arrow-down text-danger';
+    const confidenceClass = getConfidenceClass(signal.confidence_score);
+    
+    col.innerHTML = `
+        <div class="card signal-card ${signalClass} h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div>
+                        <h6 class="card-title mb-1">
+                            <i class="fas ${signalIcon} me-2"></i>
+                            ${signal.signal_type} Signal
+                        </h6>
+                        <div class="signal-timestamp">
+                            <i class="fas fa-clock me-1"></i>
+                            ${signal.signal_time_ist || signal.signal_time}
+                        </div>
+                    </div>
+                    <span class="badge ${signal.signal_type === 'BUY' ? 'bg-success' : 'bg-danger'} signal-badge">
+                        ₹${signal.price.toFixed(2)}
+                    </span>
+                </div>
+                
+                <div class="row text-center mb-2">
+                    <div class="col-6">
+                        <div class="small text-muted">Fast MA</div>
+                        <div class="fw-bold">${signal.fast_ma ? signal.fast_ma.toFixed(2) : 'N/A'}</div>
+                    </div>
+                    <div class="col-6">
+                        <div class="small text-muted">Slow MA</div>
+                        <div class="fw-bold">${signal.slow_ma ? signal.slow_ma.toFixed(2) : 'N/A'}</div>
+                    </div>
+                </div>
+                
+                <div class="mb-2">
+                    <div class="small text-muted">MA Difference</div>
+                    <div class="fw-bold ${signal.ma_difference > 0 ? 'price-up' : 'price-down'}">
+                        ${signal.ma_difference ? signal.ma_difference.toFixed(2) : 'N/A'}
+                        (${signal.ma_difference_percent ? signal.ma_difference_percent.toFixed(3) : 'N/A'}%)
+                    </div>
+                </div>
+                
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="small text-muted">Confidence</span>
+                        <span class="small fw-bold">${signal.confidence_score || 0}%</span>
+                    </div>
+                    <div class="confidence-bar ${confidenceClass}"></div>
+                </div>
+                
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="badge ${signal.trend_direction === 'UP' ? 'bg-success' : 'bg-danger'} badge-sm">
+                        ${signal.trend_direction || 'N/A'} Trend
+                    </span>
+                    ${signal.pnl !== null ? `
+                        <span class="small fw-bold ${signal.pnl > 0 ? 'price-up' : 'price-down'}">
+                            P&L: ${signal.pnl > 0 ? '+' : ''}${signal.pnl.toFixed(2)}
+                        </span>
+                    ` : ''}
+                </div>
+            </div>
+        </div>
+    `;
+    
+    return col;
+}
+
+// Get confidence class based on score
+function getConfidenceClass(score) {
+    if (score >= 75) return 'confidence-high';
+    if (score >= 50) return 'confidence-medium';
+    return 'confidence-low';
+}
+
+// Show latest signal alert
+function showLatestSignal(signal) {
+    const alertDiv = document.getElementById('latestSignalAlert');
+    const textSpan = document.getElementById('latestSignalText');
+    
+    const signalText = `${signal.signal_type} at ₹${signal.price.toFixed(2)} • ${signal.signal_time_ist || signal.signal_time} • Confidence: ${signal.confidence_score}%`;
+    
+    textSpan.textContent = signalText;
+    alertDiv.className = `alert ${signal.signal_type === 'BUY' ? 'alert-success' : 'alert-danger'}`;
+    alertDiv.style.display = 'block';
+}
+
+// Hide latest signal alert
+function hideLatestSignal() {
+    document.getElementById('latestSignalAlert').style.display = 'none';
+}
+
+// Generate new signals
+async function generateSignals() {
+    try {
+        const response = await fetch('/signals/api/generate-signals', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ lookback_hours: 24 })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert(`✅ Generated ${result.signals_generated} new signals`);
+            loadSignals();
+            loadPerformance();
+        } else {
+            alert(`❌ Error: ${result.error}`);
+        }
+    } catch (error) {
+        console.error('Error generating signals:', error);
+        alert('❌ Failed to generate signals');
+    }
+}
+
+// Auto-refresh functionality
+function startAutoRefresh() {
+    autoRefreshInterval = setInterval(() => {
+        if (autoRefreshEnabled) {
+            loadSignals();
+            loadPerformance();
+        }
+    }, 30000); // Refresh every 30 seconds
+}
+
+function toggleAutoRefresh() {
+    autoRefreshEnabled = !autoRefreshEnabled;
+    
+    const btn = document.getElementById('autoRefreshBtn');
+    const indicator = document.getElementById('refreshText');
+    
+    if (autoRefreshEnabled) {
+        btn.innerHTML = '<i class="fas fa-pause me-1"></i>Pause Auto-refresh';
+        indicator.textContent = 'Auto-refresh: ON';
+    } else {
+        btn.innerHTML = '<i class="fas fa-play me-1"></i>Start Auto-refresh';
+        indicator.textContent = 'Auto-refresh: PAUSED';
+    }
+}
+
+// Utility functions
+function showLoading(show) {
+    document.getElementById('loadingSpinner').style.display = show ? 'block' : 'none';
+}
+
+function showSignalsContainer(show) {
+    document.getElementById('signalsContainer').style.display = show ? 'block' : 'none';
+}
+
+function showNoData(show) {
+    document.getElementById('noDataMessage').style.display = show ? 'block' : 'none';
+}
+
+function updateSignalsCount(count) {
+    document.getElementById('signalsCount').textContent = `${count} signals`;
+}
+
+function showError(message) {
+    alert(`Error: ${message}`);
+}
+</script>
+{% endblock %}
